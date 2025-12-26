@@ -1,26 +1,25 @@
 @echo off
+chcp 65001 >nul 2>&1
 echo ========================================
-echo 啟動 Oracle 資料庫容器
+echo Starting Oracle Database Container
 echo ========================================
 echo.
 
-echo 正在啟動 Oracle Database Free...
+echo Starting Oracle Database Free...
 docker-compose -f docker-compose-oracle-free.yml up -d
 
 echo.
-echo 等待資料庫啟動中（約 1-2 分鐘）...
-echo 請稍候...
+echo Waiting for database to start (about 1-2 minutes)...
+echo Please wait...
 
 timeout /t 5 /nobreak >nul
 
 echo.
-echo 查看容器狀態：
+echo Checking container status:
 docker ps | findstr order-currency-oracle
 
 echo.
-echo 查看啟動日誌（按 Ctrl+C 退出）：
+echo Viewing startup logs (Press Ctrl+C to exit):
 docker logs -f order-currency-oracle
 
 pause
-
-
