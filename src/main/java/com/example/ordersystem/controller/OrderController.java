@@ -21,7 +21,11 @@ public class OrderController {
     private OrderService orderService;
     
     @GetMapping
-    public ResponseEntity<List<Order>> getAllOrders() {
+    public ResponseEntity<List<Order>> getAllOrders(@RequestParam(required = false) String searchOrderId) {
+        if (searchOrderId != null && !searchOrderId.trim().isEmpty()) {
+            List<Order> orders = orderService.searchOrdersByOrderId(searchOrderId);
+            return ResponseEntity.ok(orders);
+        }
         List<Order> orders = orderService.getAllOrders();
         return ResponseEntity.ok(orders);
     }

@@ -31,9 +31,21 @@
     </div>
 
     <div class="card">
-      <div style="display: flex; justify-content: space-between; align-items: center;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <h2>訂單列表</h2>
         <button class="btn-success" @click="openAddModal">新增訂單</button>
+      </div>
+      
+      <div class="form-group" style="margin-bottom: 15px;">
+        <label>搜尋訂單ID：</label>
+        <input 
+          type="text" 
+          v-model="searchOrderId" 
+          @input="debounceSearch"
+          placeholder="輸入訂單ID進行搜尋（後端搜尋，支援大量資料）" 
+          style="width: 400px;"
+        />
+        <button class="btn-secondary" @click="clearSearch" style="margin-left: 10px;">清除</button>
       </div>
       
       <table>
@@ -126,6 +138,8 @@ export default {
       convertedResult: null,
       showModal: false,
       isEditMode: false,
+      searchOrderId: '',
+      searchTimer: null,
       currentOrder: {
         username: '',
         amount: 0,
@@ -140,14 +154,27 @@ export default {
     this.loadCurrencies()
   },
   methods: {
-    async loadOrders() {
+    async loadOrders(searchOrderId = null) {
       try {
-        const response = await axios.get(`${API_BASE_URL}/orders`)
+        const params = searchOrderId && searchOrderId.trim() 
+          ? { searchOrderId: searchOrderId.trim() } 
+          : {}
+        const response = await axios.get(`${API_BASE_URL}/orders`, { params })
         this.orders = response.data
       } catch (error) {
         console.error('載入訂單失敗:', error)
         alert('載入訂單失敗')
       }
+    },
+    debounceSearch() {
+      // 清除之前的計時器
+      if (this.searchTimer) {
+        clearTimeout(this.searchTimer)
+      }
+      // 設定新的計時器，500ms 後執行搜尋
+      this.searchTimer = setTimeout(() => {
+        this.loadOrders(this.searchOrderId)
+      }, 500)
     },
     async loadCurrencies() {
       try {
@@ -223,7 +250,7 @@ export default {
           await axios.post(`${API_BASE_URL}/orders`, this.currentOrder)
         }
         this.closeModal()
-        this.loadOrders()
+        this.loadOrders(this.searchOrderId)
       } catch (error) {
         console.error('儲存訂單失敗:', error)
         alert('儲存訂單失敗')
@@ -233,12 +260,16 @@ export default {
       if (confirm('確定要刪除這個訂單嗎？')) {
         try {
           await axios.delete(`${API_BASE_URL}/orders/${orderId}`)
-          this.loadOrders()
+          this.loadOrders(this.searchOrderId)
         } catch (error) {
           console.error('刪除訂單失敗:', error)
           alert('刪除訂單失敗')
         }
       }
+    },
+    clearSearch() {
+      this.searchOrderId = ''
+      this.loadOrders()
     }
   }
 }
