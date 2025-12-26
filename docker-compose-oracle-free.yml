@@ -1,0 +1,31 @@
+version: '3.8'
+
+# 使用 Oracle Database Free (免費版本)
+# 如果上面的官方版本需要登入，可以使用這個替代方案
+services:
+  oracle-db:
+    image: gvenzl/oracle-free:23-slim
+    container_name: order-currency-oracle
+    environment:
+      - ORACLE_PASSWORD=Oracle123
+    ports:
+      - "1521:1521"
+    volumes:
+      - oracle-data:/opt/oracle/oradata
+    healthcheck:
+      test: ["CMD-SHELL", "sqlplus -s sys/Oracle123@localhost:1521/FREEPDB1 as sysdba <<< 'select 1 from dual;' | grep -q 1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    networks:
+      - order-currency-network
+
+volumes:
+  oracle-data:
+
+networks:
+  order-currency-network:
+    driver: bridge
+
+
