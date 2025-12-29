@@ -21,3 +21,6 @@ echo "查看啟動日誌（按 Ctrl+C 退出）："
 docker logs -f order-currency-oracle
 
 
+
+
+

@@ -1,6 +1,7 @@
 package com.example.ordersystem.service;
 
 import com.example.ordersystem.model.Currency;
+import com.example.ordersystem.model.CurrencyCode;
 import com.example.ordersystem.repository.CurrencyRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -37,10 +38,10 @@ public class CurrencyService {
     /**
      * 根據幣別代碼取得幣別資訊
      * 
-     * @param currencyCode 幣別代碼（如：USD, EUR, JPY, TWD）
+     * @param currencyCode 幣別代碼 Enum（如：USD, EUR, JPY, TWD）
      * @return 幣別的 Optional 物件，如果不存在則返回空 Optional
      */
-    public Optional<Currency> getCurrencyByCode(String currencyCode) {
+    public Optional<Currency> getCurrencyByCode(CurrencyCode currencyCode) {
         return currencyRepository.findByCurrencyCode(currencyCode);
     }
     
@@ -58,9 +59,9 @@ public class CurrencyService {
     /**
      * 刪除幣別
      * 
-     * @param currencyCode 要刪除的幣別代碼
+     * @param currencyCode 要刪除的幣別代碼 Enum
      */
-    public void deleteCurrency(String currencyCode) {
+    public void deleteCurrency(CurrencyCode currencyCode) {
         currencyRepository.deleteById(currencyCode);
     }
     
@@ -69,13 +70,13 @@ public class CurrencyService {
      * 如果來源幣別已經是 TWD，則直接返回原金額
      * 
      * @param amount 要轉換的金額
-     * @param sourceCurrency 來源幣別代碼
+     * @param sourceCurrency 來源幣別代碼 Enum
      * @return 轉換後的新台幣金額（保留2位小數）
      * @throws RuntimeException 如果找不到指定的幣別
      * @apiNote 故意留一個小 bug：沒有處理匯率為 null 的情況
      */
-    public BigDecimal convertToTwd(BigDecimal amount, String sourceCurrency) {
-        if (sourceCurrency.equals("TWD")) {
+    public BigDecimal convertToTwd(BigDecimal amount, CurrencyCode sourceCurrency) {
+        if (sourceCurrency == CurrencyCode.TWD) {
             return amount;
         }
         
@@ -94,21 +95,21 @@ public class CurrencyService {
      * 如果來源幣別和目標幣別相同，則直接返回原金額
      * 
      * @param amount 要轉換的金額
-     * @param sourceCurrency 來源幣別代碼
-     * @param targetCurrency 目標幣別代碼
+     * @param sourceCurrency 來源幣別代碼 Enum
+     * @param targetCurrency 目標幣別代碼 Enum
      * @return 轉換後的目標幣別金額（保留2位小數）
      * @throws RuntimeException 如果找不到指定的幣別
      * @apiNote 故意留一個不優化的地方：除法運算可能會有精度問題
      */
-    public BigDecimal convertCurrency(BigDecimal amount, String sourceCurrency, String targetCurrency) {
-        if (sourceCurrency.equals(targetCurrency)) {
+    public BigDecimal convertCurrency(BigDecimal amount, CurrencyCode sourceCurrency, CurrencyCode targetCurrency) {
+        if (sourceCurrency == targetCurrency) {
             return amount;
         }
         
         // 先轉換為 TWD，再轉換為目標幣別
         BigDecimal twdAmount = convertToTwd(amount, sourceCurrency);
         
-        if (targetCurrency.equals("TWD")) {
+        if (targetCurrency == CurrencyCode.TWD) {
             return twdAmount;
         }
         
@@ -125,12 +126,12 @@ public class CurrencyService {
      * 更新指定幣別的匯率
      * 只更新匯率，不更新其他欄位
      * 
-     * @param currencyCode 幣別代碼
+     * @param currencyCode 幣別代碼 Enum
      * @param newRate 新的匯率（相對於 TWD 的匯率）
      * @return 更新後的幣別物件
      * @throws RuntimeException 如果找不到指定的幣別
      */
-    public Currency updateRate(String currencyCode, BigDecimal newRate) {
+    public Currency updateRate(CurrencyCode currencyCode, BigDecimal newRate) {
         Optional<Currency> currencyOpt = currencyRepository.findByCurrencyCode(currencyCode);
         if (currencyOpt.isPresent()) {
             Currency currency = currencyOpt.get();

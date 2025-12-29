@@ -1,5 +1,6 @@
 package com.example.ordersystem.service;
 
+import com.example.ordersystem.model.CurrencyCode;
 import com.example.ordersystem.model.Order;
 import com.example.ordersystem.repository.OrderRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -188,16 +189,16 @@ public class OrderService {
      * 轉換流程：訂單原始幣別 → TWD → 目標幣別
      * 
      * @param orderId 訂單ID
-     * @param targetCurrency 目標幣別代碼（如：USD, EUR, JPY）
+     * @param targetCurrency 目標幣別代碼 Enum（如：USD, EUR, JPY）
      * @return 轉換後的目標幣別金額（保留2位小數）
      * @throws RuntimeException 如果訂單不存在或目標幣別不存在
      */
-    public BigDecimal convertCurrency(Long orderId, String targetCurrency) {
+    public BigDecimal convertCurrency(Long orderId, CurrencyCode targetCurrency) {
         Optional<Order> optionalOrder = orderRepository.findById(orderId);
         if (optionalOrder.isPresent()) {
             Order order = optionalOrder.get();
             BigDecimal amount = order.getFinalAmount();
-            String sourceCurrency = order.getCurrency();
+            CurrencyCode sourceCurrency = order.getCurrency();
             return currencyService.convertCurrency(amount, sourceCurrency, targetCurrency);
         }
         throw new RuntimeException("訂單不存在: " + orderId);

@@ -73,7 +73,7 @@
             <td>
               <button class="btn-primary" @click="openEditModal(order)">編輯</button>
               <button class="btn-danger" @click="deleteOrder(order.orderId)">刪除</button>
-              <button class="btn-secondary" @click="convertOrderToTwd(order.orderId)">轉TWD</button>
+              <button class="btn-secondary" @click="convertOrderToTwd(order.orderId)">轉{{ CurrencyCodes.TWD }}</button>
             </td>
           </tr>
         </tbody>
@@ -126,6 +126,15 @@ import axios from 'axios'
 
 const API_BASE_URL = 'http://localhost:8080/api'
 
+// Currency Code Enum Constants
+const CurrencyCode = {
+  TWD: 'TWD',
+  USD: 'USD',
+  EUR: 'EUR',
+  JPY: 'JPY',
+  CNY: 'CNY'
+}
+
 export default {
   name: 'App',
   data() {
@@ -133,8 +142,8 @@ export default {
       orders: [],
       currencies: [],
       convertAmount: 0,
-      sourceCurrency: 'USD',
-      targetCurrency: 'TWD',
+      sourceCurrency: CurrencyCode.USD,
+      targetCurrency: CurrencyCode.TWD,
       convertedResult: null,
       showModal: false,
       isEditMode: false,
@@ -143,7 +152,7 @@ export default {
       currentOrder: {
         username: '',
         amount: 0,
-        currency: 'USD',
+        currency: CurrencyCode.USD,
         discount: 0,
         status: 'PENDING'
       }
@@ -187,8 +196,8 @@ export default {
         console.error('載入幣別失敗:', error)
         // 如果沒有幣別資料，使用預設值
         this.currencies = [
-          { currencyCode: 'TWD', rateToTwd: 1 },
-          { currencyCode: 'USD', rateToTwd: 0.032 }
+          { currencyCode: CurrencyCode.TWD, rateToTwd: 1 },
+          { currencyCode: CurrencyCode.USD, rateToTwd: 0.032 }
         ]
       }
     },
@@ -210,7 +219,7 @@ export default {
     async convertOrderToTwd(orderId) {
       try {
         const response = await axios.get(`${API_BASE_URL}/orders/${orderId}/convert/twd`)
-        alert(`轉換為 TWD: ${response.data.toFixed(2)}`)
+        alert(`轉換為 ${CurrencyCode.TWD}: ${response.data.toFixed(2)}`)
       } catch (error) {
         console.error('轉換失敗:', error)
         alert('轉換失敗')
@@ -221,7 +230,7 @@ export default {
       this.currentOrder = {
         username: '',
         amount: 0,
-        currency: 'USD',
+        currency: CurrencyCode.USD,
         discount: 0,
         status: 'PENDING'
       }
@@ -270,6 +279,12 @@ export default {
     clearSearch() {
       this.searchOrderId = ''
       this.loadOrders()
+    }
+  },
+  // Expose CurrencyCode to template
+  computed: {
+    CurrencyCodes() {
+      return CurrencyCode
     }
   }
 }

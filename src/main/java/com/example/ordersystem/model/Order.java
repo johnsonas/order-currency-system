@@ -26,9 +26,10 @@ public class Order {
     @Column(name = "AMOUNT", nullable = false, precision = 19, scale = 2)
     private BigDecimal amount;
     
-    @NotBlank(message = "幣別不能為空")
+    @NotNull(message = "幣別不能為空")
+    @Enumerated(EnumType.STRING)
     @Column(name = "CURRENCY", nullable = false, length = 3)
-    private String currency;
+    private CurrencyCode currency;
     
     @Column(name = "STATUS", length = 20)
     private String status = "PENDING";
@@ -81,11 +82,11 @@ public class Order {
         this.amount = amount;
     }
     
-    public String getCurrency() {
+    public CurrencyCode getCurrency() {
         return currency;
     }
     
-    public void setCurrency(String currency) {
+    public void setCurrency(CurrencyCode currency) {
         this.currency = currency;
     }
     

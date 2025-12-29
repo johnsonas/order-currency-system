@@ -148,3 +148,6 @@ Oracle 需要至少 2GB RAM，確保 Docker Desktop 分配足夠記憶體。
 - Password: postgres123
 
 
+
+
+

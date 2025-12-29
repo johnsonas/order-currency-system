@@ -1,6 +1,7 @@
 package com.example.ordersystem.controller;
 
 import com.example.ordersystem.model.Currency;
+import com.example.ordersystem.model.CurrencyCode;
 import com.example.ordersystem.service.CurrencyService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,7 +29,11 @@ public class CurrencyController {
     
     @GetMapping("/{code}")
     public ResponseEntity<Currency> getCurrencyByCode(@PathVariable String code) {
-        Optional<Currency> currency = currencyService.getCurrencyByCode(code);
+        CurrencyCode currencyCode = CurrencyCode.fromCode(code);
+        if (currencyCode == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        Optional<Currency> currency = currencyService.getCurrencyByCode(currencyCode);
         return currency.map(ResponseEntity::ok)
                       .orElse(ResponseEntity.notFound().build());
     }
@@ -43,7 +48,11 @@ public class CurrencyController {
     public ResponseEntity<Currency> updateCurrency(
             @PathVariable String code,
             @Valid @RequestBody Currency currency) {
-        currency.setCurrencyCode(code);
+        CurrencyCode currencyCode = CurrencyCode.fromCode(code);
+        if (currencyCode == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        currency.setCurrencyCode(currencyCode);
         Currency updatedCurrency = currencyService.createOrUpdateCurrency(currency);
         return ResponseEntity.ok(updatedCurrency);
     }
@@ -53,7 +62,11 @@ public class CurrencyController {
             @PathVariable String code,
             @RequestBody BigDecimal newRate) {
         try {
-            Currency updatedCurrency = currencyService.updateRate(code, newRate);
+            CurrencyCode currencyCode = CurrencyCode.fromCode(code);
+            if (currencyCode == null) {
+                return ResponseEntity.badRequest().build();
+            }
+            Currency updatedCurrency = currencyService.updateRate(currencyCode, newRate);
             return ResponseEntity.ok(updatedCurrency);
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
@@ -62,7 +75,11 @@ public class CurrencyController {
     
     @DeleteMapping("/{code}")
     public ResponseEntity<Void> deleteCurrency(@PathVariable String code) {
-        currencyService.deleteCurrency(code);
+        CurrencyCode currencyCode = CurrencyCode.fromCode(code);
+        if (currencyCode == null) {
+            return ResponseEntity.badRequest().build();
+        }
+        currencyService.deleteCurrency(currencyCode);
         return ResponseEntity.noContent().build();
     }
     
@@ -72,7 +89,12 @@ public class CurrencyController {
             @RequestParam String sourceCurrency,
             @RequestParam String targetCurrency) {
         try {
-            BigDecimal convertedAmount = currencyService.convertCurrency(amount, sourceCurrency, targetCurrency);
+            CurrencyCode source = CurrencyCode.fromCode(sourceCurrency);
+            CurrencyCode target = CurrencyCode.fromCode(targetCurrency);
+            if (source == null || target == null) {
+                return ResponseEntity.badRequest().build();
+            }
+            BigDecimal convertedAmount = currencyService.convertCurrency(amount, source, target);
             return ResponseEntity.ok(convertedAmount);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();

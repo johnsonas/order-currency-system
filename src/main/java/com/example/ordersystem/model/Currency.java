@@ -1,7 +1,6 @@
 package com.example.ordersystem.model;
 
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import java.math.BigDecimal;
@@ -12,9 +11,10 @@ import java.time.LocalDateTime;
 public class Currency {
     
     @Id
-    @NotBlank(message = "幣別代碼不能為空")
+    @NotNull(message = "幣別代碼不能為空")
+    @Enumerated(EnumType.STRING)
     @Column(name = "CURRENCY_CODE", length = 3, nullable = false)
-    private String currencyCode;
+    private CurrencyCode currencyCode;
     
     @NotNull(message = "匯率不能為空")
     @Positive(message = "匯率必須大於0")
@@ -35,11 +35,11 @@ public class Currency {
     }
     
     // Getters and Setters
-    public String getCurrencyCode() {
+    public CurrencyCode getCurrencyCode() {
         return currencyCode;
     }
     
-    public void setCurrencyCode(String currencyCode) {
+    public void setCurrencyCode(CurrencyCode currencyCode) {
         this.currencyCode = currencyCode;
     }
     

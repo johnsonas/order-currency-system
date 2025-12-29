@@ -1,5 +1,6 @@
 package com.example.ordersystem.controller;
 
+import com.example.ordersystem.model.CurrencyCode;
 import com.example.ordersystem.model.Order;
 import com.example.ordersystem.service.OrderService;
 import jakarta.validation.Valid;
@@ -86,7 +87,11 @@ public class OrderController {
             @PathVariable Long id,
             @PathVariable String targetCurrency) {
         try {
-            BigDecimal convertedAmount = orderService.convertCurrency(id, targetCurrency);
+            CurrencyCode currencyCode = CurrencyCode.fromCode(targetCurrency);
+            if (currencyCode == null) {
+                return ResponseEntity.badRequest().build();
+            }
+            BigDecimal convertedAmount = orderService.convertCurrency(id, currencyCode);
             return ResponseEntity.ok(convertedAmount);
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
