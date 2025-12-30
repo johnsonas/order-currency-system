@@ -4,6 +4,8 @@ import com.example.ordersystem.model.CurrencyCode;
 import com.example.ordersystem.model.Order;
 import com.example.ordersystem.repository.OrderRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +40,23 @@ public class OrderService {
      */
     public List<Order> getAllOrders() {
         return orderRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt"));
+    }
+    
+    /**
+     * 取得所有訂單列表（分頁）
+     * 按照建立時間降序排列（最新的訂單在前）
+     * 
+     * @param pageable 分頁參數
+     * @return 分頁的訂單列表，按建立時間降序排列
+     */
+    public Page<Order> getAllOrders(Pageable pageable) {
+        return orderRepository.findAll(
+            org.springframework.data.domain.PageRequest.of(
+                pageable.getPageNumber(),
+                pageable.getPageSize(),
+                Sort.by(Sort.Direction.DESC, "createdAt")
+            )
+        );
     }
     
     /**
@@ -99,6 +118,44 @@ public class OrderService {
         
         // 模糊搜尋（部分匹配）
         return orderRepository.searchByOrderIdContaining(trimmedId);
+    }
+    
+    /**
+     * 根據訂單ID進行搜尋（分頁）
+     * 支援精確匹配和模糊搜尋：
+     * - 如果輸入的是完整數字，先嘗試精確匹配
+     * - 如果精確匹配失敗或輸入不是數字，則進行模糊搜尋（部分匹配）
+     * - 如果搜尋條件為空，返回所有訂單（分頁）
+     * 
+     * @param orderId 訂單ID（可以是完整ID或部分ID字串）
+     * @param pageable 分頁參數
+     * @return 符合搜尋條件的分頁訂單列表，按建立時間降序排列
+     */
+    public Page<Order> searchOrdersByOrderId(String orderId, Pageable pageable) {
+        if (orderId == null || orderId.trim().isEmpty()) {
+            return getAllOrders(pageable);
+        }
+        String trimmedId = orderId.trim();
+        
+        // 先嘗試精確匹配（如果是完整數字）
+        try {
+            Long exactId = Long.parseLong(trimmedId);
+            Optional<Order> exactOrder = orderRepository.findByOrderId(exactId);
+            if (exactOrder.isPresent()) {
+                // 返回單一結果的分頁物件
+                List<Order> singleOrder = List.of(exactOrder.get());
+                return new org.springframework.data.domain.PageImpl<>(
+                    singleOrder, 
+                    pageable, 
+                    1
+                );
+            }
+        } catch (NumberFormatException e) {
+            // 如果不是數字，使用模糊搜尋
+        }
+        
+        // 模糊搜尋（部分匹配）
+        return orderRepository.searchByOrderIdContaining(trimmedId, pageable);
     }
     
     /**

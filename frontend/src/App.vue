@@ -106,6 +106,38 @@
               </tr>
             </tbody>
           </table>
+          
+          <!-- 分頁控制 -->
+          <div class="pagination-container" style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span>每頁顯示：</span>
+              <select v-model="pageSize" @change="onPageSizeChange" style="padding: 5px 10px; border: 1px solid #ddd; border-radius: 4px;">
+                <option :value="10">10</option>
+                <option :value="20">20</option>
+                <option :value="50">50</option>
+              </select>
+              <span>筆</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span>共 {{ totalElements }} 筆，第 {{ currentPageNumber + 1 }} / {{ totalPages }} 頁</span>
+              <button 
+                class="btn-secondary" 
+                @click="goToPage(currentPageNumber - 1)"
+                :disabled="currentPageNumber === 0"
+                style="padding: 5px 15px;"
+              >
+                上一頁
+              </button>
+              <button 
+                class="btn-secondary" 
+                @click="goToPage(currentPageNumber + 1)"
+                :disabled="currentPageNumber >= totalPages - 1"
+                style="padding: 5px 15px;"
+              >
+                下一頁
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -186,7 +218,12 @@ export default {
         discount: 0,
         status: 'PENDING'
       },
-      currentPage: 'orders'  // 預設顯示訂單列表
+      currentPage: 'orders',  // 預設顯示訂單列表
+      // 分頁相關
+      currentPageNumber: 0,
+      pageSize: 10,
+      totalPages: 0,
+      totalElements: 0
     }
   },
   mounted() {
@@ -198,16 +235,36 @@ export default {
       this.currentPage = page
       // 如果切換到訂單列表頁面，確保載入訂單資料
       if (page === 'orders') {
+        this.currentPageNumber = 0  // 重置到第一頁
         this.loadOrders()
       }
     },
-    async loadOrders(searchOrderId = null) {
+    async loadOrders(searchOrderId = null, page = null, size = null) {
       try {
-        const params = searchOrderId && searchOrderId.trim() 
-          ? { searchOrderId: searchOrderId.trim() } 
-          : {}
+        const params = {
+          page: page !== null ? page : this.currentPageNumber,
+          size: size !== null ? size : this.pageSize
+        }
+        
+        if (searchOrderId && searchOrderId.trim()) {
+          params.searchOrderId = searchOrderId.trim()
+        }
+        
         const response = await axios.get(`${API_BASE_URL}/orders`, { params })
-        this.orders = response.data
+        
+        // 處理分頁響應
+        if (response.data.content) {
+          this.orders = response.data.content
+          this.totalPages = response.data.totalPages
+          this.totalElements = response.data.totalElements
+          this.currentPageNumber = response.data.number
+        } else {
+          // 向後兼容：如果後端返回的是列表
+          this.orders = response.data
+          this.totalPages = 1
+          this.totalElements = response.data.length
+          this.currentPageNumber = 0
+        }
       } catch (error) {
         console.error('載入訂單失敗:', error)
         alert('載入訂單失敗')
@@ -218,9 +275,11 @@ export default {
       if (this.searchTimer) {
         clearTimeout(this.searchTimer)
       }
+      // 重置到第一頁
+      this.currentPageNumber = 0
       // 設定新的計時器，500ms 後執行搜尋
       this.searchTimer = setTimeout(() => {
-        this.loadOrders(this.searchOrderId)
+        this.loadOrders(this.searchOrderId, 0, this.pageSize)
       }, 500)
     },
     async loadCurrencies() {
@@ -297,7 +356,7 @@ export default {
           await axios.post(`${API_BASE_URL}/orders`, this.currentOrder)
         }
         this.closeModal()
-        this.loadOrders(this.searchOrderId)
+        this.loadOrders(this.searchOrderId, this.currentPageNumber, this.pageSize)
       } catch (error) {
         console.error('儲存訂單失敗:', error)
         alert('儲存訂單失敗')
@@ -307,7 +366,7 @@ export default {
       if (confirm('確定要刪除這個訂單嗎？')) {
         try {
           await axios.delete(`${API_BASE_URL}/orders/${orderId}`)
-          this.loadOrders(this.searchOrderId)
+          this.loadOrders(this.searchOrderId, this.currentPageNumber, this.pageSize)
         } catch (error) {
           console.error('刪除訂單失敗:', error)
           alert('刪除訂單失敗')
@@ -316,7 +375,18 @@ export default {
     },
     clearSearch() {
       this.searchOrderId = ''
+      this.currentPageNumber = 0
       this.loadOrders()
+    },
+    goToPage(page) {
+      if (page >= 0 && page < this.totalPages) {
+        this.currentPageNumber = page
+        this.loadOrders(this.searchOrderId, page, this.pageSize)
+      }
+    },
+    onPageSizeChange() {
+      this.currentPageNumber = 0  // 重置到第一頁
+      this.loadOrders(this.searchOrderId, 0, this.pageSize)
     }
   },
   // Expose CurrencyCode to template

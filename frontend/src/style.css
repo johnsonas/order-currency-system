@@ -251,3 +251,27 @@ tr:hover {
   color: #000;
 }
 
+/* 分頁控制元件樣式 */
+.pagination-container {
+  padding: 15px 0;
+  border-top: 1px solid #ddd;
+}
+
+.pagination-container button:disabled {
+  background-color: #bdc3c7;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.pagination-container button:disabled:hover {
+  background-color: #bdc3c7;
+}
+
+.pagination-container select {
+  padding: 5px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
