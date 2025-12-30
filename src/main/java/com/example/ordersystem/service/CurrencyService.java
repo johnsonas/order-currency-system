@@ -9,30 +9,36 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-
 /**
- * 幣別服務類
- * 提供幣別相關的業務邏輯處理，包括幣別的 CRUD 操作、匯率轉換等功能
+ * 幣別匯率服務類
+ * 提供幣別查詢、新增、更新、刪除及匯率換算等業務邏輯處理
+ * 
+ * 本服務用於管理系統支援的各種幣別與兌台幣（TWD）的匯率，
+ * 並支援金額的幣別轉換功能。
  * 
  * @author Order Currency System
  * @version 1.0
  */
+
 @Service
 @Transactional
 public class CurrencyService {
     
     @Autowired
     private CurrencyRepository currencyRepository;
-    
+
+
     /**
      * 取得所有幣別列表
      * 
-     * @return 所有幣別的列表
+     * @return 所有幣別的列表，如果為 null 則返回空列表
      */
     public List<Currency> getAllCurrencies() {
-        return currencyRepository.findAll();
+        List<Currency> currencies = currencyRepository.findAll();
+        return currencies != null ? currencies : Collections.emptyList();
     }
     
     /**
@@ -45,6 +51,10 @@ public class CurrencyService {
         return currencyRepository.findByCurrencyCode(currencyCode);
     }
     
+
+
+
+
     /**
      * 建立或更新幣別資訊
      * 如果幣別代碼已存在則更新，不存在則建立
@@ -140,5 +150,11 @@ public class CurrencyService {
         }
         throw new RuntimeException("找不到幣別: " + currencyCode);
     }
+
+   
+
+
+
+    
 }
 

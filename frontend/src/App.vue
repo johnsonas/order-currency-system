@@ -1,83 +1,113 @@
 <template>
   <div id="app">
-    <h1>訂單與幣別轉換系統</h1>
-    
-    <div class="card">
-      <h2>幣別換算</h2>
-      <div class="form-group">
-        <label>金額：</label>
-        <input type="number" v-model.number="convertAmount" placeholder="輸入金額" step="0.01" />
+    <div class="app-container">
+      <!-- 左側選單 -->
+      <div class="sidebar">
+        <div class="sidebar-header">
+          <h1>訂單與幣別轉換系統</h1>
+        </div>
+        <nav class="sidebar-menu">
+          <div 
+            class="menu-item" 
+            :class="{ active: currentPage === 'orders' }"
+            @click="changePage('orders')"
+          >
+            <span class="menu-icon">📋</span>
+            <span class="menu-text">訂單列表</span>
+          </div>
+          <div 
+            class="menu-item" 
+            :class="{ active: currentPage === 'currency' }"
+            @click="changePage('currency')"
+          >
+            <span class="menu-icon">💱</span>
+            <span class="menu-text">幣別轉換系統</span>
+          </div>
+        </nav>
       </div>
-      <div class="form-group">
-        <label>來源幣別：</label>
-        <select v-model="sourceCurrency">
-          <option v-for="currency in currencies" :key="currency.currencyCode" :value="currency.currencyCode">
-            {{ currency.currencyCode }}
-          </option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>目標幣別：</label>
-        <select v-model="targetCurrency">
-          <option v-for="currency in currencies" :key="currency.currencyCode" :value="currency.currencyCode">
-            {{ currency.currencyCode }}
-          </option>
-        </select>
-      </div>
-      <button class="btn-primary" @click="convertCurrency">換算</button>
-      <div v-if="convertedResult !== null" style="margin-top: 15px; padding: 10px; background-color: #e8f5e9; border-radius: 4px;">
-        <strong>換算結果：{{ convertedResult.toFixed(2) }} {{ targetCurrency }}</strong>
-      </div>
-    </div>
 
-    <div class="card">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <h2>訂單列表</h2>
-        <button class="btn-success" @click="openAddModal">新增訂單</button>
+      <!-- 主內容區 -->
+      <div class="main-content">
+        <!-- 幣別轉換頁面 -->
+        <div v-if="currentPage === 'currency'" class="card">
+          <h2>幣別換算</h2>
+          <div class="form-group">
+            <label>金額：</label>
+            <input type="number" v-model.number="convertAmount" placeholder="輸入金額" step="0.01" />
+          </div>
+          <div class="form-group">
+            <label>來源幣別：</label>
+            <select v-model="sourceCurrency">
+              <option v-for="currency in currencies" :key="currency.currencyCode" :value="currency.currencyCode">
+                {{ currency.currencyCode }}
+              </option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>目標幣別：</label>
+            <select v-model="targetCurrency">
+              <option v-for="currency in currencies" :key="currency.currencyCode" :value="currency.currencyCode">
+                {{ currency.currencyCode }}
+              </option>
+            </select>
+          </div>
+          <button class="btn-primary" @click="convertCurrency">換算</button>
+          <div v-if="convertedResult !== null" style="margin-top: 15px; padding: 10px; background-color: #e8f5e9; border-radius: 4px;">
+            <strong>換算結果：{{ convertedResult.toFixed(2) }} {{ targetCurrency }}</strong>
+          </div>
+        </div>
+
+        <!-- 訂單列表頁面 -->
+        <div v-if="currentPage === 'orders'" class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2>訂單列表</h2>
+            <button class="btn-success" @click="openAddModal">新增訂單</button>
+          </div>
+          
+          <div class="form-group" style="margin-bottom: 15px;">
+            <label>搜尋訂單ID：</label>
+            <input 
+              type="text" 
+              v-model="searchOrderId" 
+              @input="debounceSearch"
+              placeholder="輸入訂單ID進行搜尋（後端搜尋，支援大量資料）" 
+              style="width: 400px;"
+            />
+            <button class="btn-secondary" @click="clearSearch" style="margin-left: 10px;">清除</button>
+          </div>
+          
+          <table>
+            <thead>
+              <tr>
+                <th>訂單ID</th>
+                <th>使用者名稱</th>
+                <th>金額</th>
+                <th>幣別</th>
+                <th>折扣 (%)</th>
+                <th>最終金額</th>
+                <th>狀態</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="order in orders" :key="order.orderId">
+                <td>{{ order.orderId }}</td>
+                <td>{{ order.username }}</td>
+                <td>{{ order.amount.toFixed(2) }}</td>
+                <td>{{ order.currency }}</td>
+                <td>{{ order.discount ? order.discount.toFixed(2) : '0.00' }}</td>
+                <td>{{ order.finalAmount ? order.finalAmount.toFixed(2) : '-' }}</td>
+                <td>{{ order.status }}</td>
+                <td>
+                  <button class="btn-primary" @click="openEditModal(order)">編輯</button>
+                  <button class="btn-danger" @click="deleteOrder(order.orderId)">刪除</button>
+                  <button class="btn-secondary" @click="convertOrderToTwd(order.orderId)">轉{{ CurrencyCodes.TWD }}</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
-      
-      <div class="form-group" style="margin-bottom: 15px;">
-        <label>搜尋訂單ID：</label>
-        <input 
-          type="text" 
-          v-model="searchOrderId" 
-          @input="debounceSearch"
-          placeholder="輸入訂單ID進行搜尋（後端搜尋，支援大量資料）" 
-          style="width: 400px;"
-        />
-        <button class="btn-secondary" @click="clearSearch" style="margin-left: 10px;">清除</button>
-      </div>
-      
-      <table>
-        <thead>
-          <tr>
-            <th>訂單ID</th>
-            <th>使用者名稱</th>
-            <th>金額</th>
-            <th>幣別</th>
-            <th>折扣 (%)</th>
-            <th>最終金額</th>
-            <th>狀態</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="order in orders" :key="order.orderId">
-            <td>{{ order.orderId }}</td>
-            <td>{{ order.username }}</td>
-            <td>{{ order.amount.toFixed(2) }}</td>
-            <td>{{ order.currency }}</td>
-            <td>{{ order.discount ? order.discount.toFixed(2) : '0.00' }}</td>
-            <td>{{ order.finalAmount ? order.finalAmount.toFixed(2) : '-' }}</td>
-            <td>{{ order.status }}</td>
-            <td>
-              <button class="btn-primary" @click="openEditModal(order)">編輯</button>
-              <button class="btn-danger" @click="deleteOrder(order.orderId)">刪除</button>
-              <button class="btn-secondary" @click="convertOrderToTwd(order.orderId)">轉{{ CurrencyCodes.TWD }}</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
     </div>
 
     <!-- 新增/編輯訂單 Modal -->
@@ -155,7 +185,8 @@ export default {
         currency: CurrencyCode.USD,
         discount: 0,
         status: 'PENDING'
-      }
+      },
+      currentPage: 'orders'  // 預設顯示訂單列表
     }
   },
   mounted() {
@@ -163,6 +194,13 @@ export default {
     this.loadCurrencies()
   },
   methods: {
+    changePage(page) {
+      this.currentPage = page
+      // 如果切換到訂單列表頁面，確保載入訂單資料
+      if (page === 'orders') {
+        this.loadOrders()
+      }
+    },
     async loadOrders(searchOrderId = null) {
       try {
         const params = searchOrderId && searchOrderId.trim() 

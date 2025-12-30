@@ -33,11 +33,13 @@ public class OrderController {
     
     @GetMapping("/{id}")
     public ResponseEntity<Order> getOrderById(@PathVariable Long id) {
-        Optional<Order> order = orderService.getOrderById(id);
-        return order.map(ResponseEntity::ok)
-                   .orElse(ResponseEntity.notFound().build());
+
+            Optional<Order> order = orderService.getOrderById(id);
+            return order.map(ResponseEntity::ok)
+                        .orElse(ResponseEntity.notFound().build());
     }
     
+
     @GetMapping("/username/{username}")
     public ResponseEntity<List<Order>> getOrdersByUsername(@PathVariable String username) {
         List<Order> orders = orderService.getOrdersByUsername(username);
@@ -97,5 +99,8 @@ public class OrderController {
             return ResponseEntity.notFound().build();
         }
     }
+
+
+    
 }
 

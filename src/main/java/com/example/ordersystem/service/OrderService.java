@@ -29,7 +29,7 @@ public class OrderService {
     
     @Autowired
     private CurrencyService currencyService;
-    
+
     /**
      * 取得所有訂單列表
      * 按照建立時間降序排列（最新的訂單在前）
@@ -203,5 +203,7 @@ public class OrderService {
         }
         throw new RuntimeException("訂單不存在: " + orderId);
     }
+
+
 }
 

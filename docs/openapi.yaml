@@ -1,0 +1,657 @@
+openapi: 3.0.3
+info:
+  title: Order Currency System API
+  description: |
+    Order Currency System REST API 文檔
+    
+    這是一個訂單管理與幣別轉換系統的 API，提供訂單 CRUD 操作和幣別轉換功能。
+  version: 1.0.0
+  contact:
+    name: Order Currency System
+    email: support@example.com
+
+servers:
+  - url: http://localhost:8080/api
+    description: 本地開發環境
+
+tags:
+  - name: Orders
+    description: 訂單相關操作
+  - name: Currencies
+    description: 幣別相關操作
+
+paths:
+  /orders:
+    get:
+      tags:
+        - Orders
+      summary: 取得所有訂單
+      description: 取得所有訂單列表，按建立時間降序排列（最新的在前）。支援根據訂單ID進行搜尋。
+      operationId: getAllOrders
+      parameters:
+        - name: searchOrderId
+          in: query
+          description: 根據訂單ID進行搜尋（支援精確匹配和模糊搜尋）
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功取得訂單列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - Orders
+      summary: 建立新訂單
+      description: 建立一筆新訂單，系統會自動計算最終金額（包含折扣）
+      operationId: createOrder
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderInput'
+      responses:
+        '201':
+          description: 訂單建立成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /orders/{id}:
+    get:
+      tags:
+        - Orders
+      summary: 根據ID取得單一訂單
+      description: 根據訂單ID取得單一訂單資訊
+      operationId: getOrderById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 訂單ID
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 成功取得訂單
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    put:
+      tags:
+        - Orders
+      summary: 更新訂單
+      description: 更新指定訂單的所有資訊，系統會重新計算最終金額
+      operationId: updateOrder
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 訂單ID
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderInput'
+      responses:
+        '200':
+          description: 訂單更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - Orders
+      summary: 刪除訂單
+      description: 刪除指定訂單
+      operationId: deleteOrder
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 訂單ID
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: 訂單刪除成功
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /orders/username/{username}:
+    get:
+      tags:
+        - Orders
+      summary: 根據使用者名稱取得訂單列表
+      description: 取得指定使用者的所有訂單
+      operationId: getOrdersByUsername
+      parameters:
+        - name: username
+          in: path
+          required: true
+          description: 使用者名稱
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功取得訂單列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /orders/status/{status}:
+    get:
+      tags:
+        - Orders
+      summary: 根據狀態取得訂單列表
+      description: 取得指定狀態的所有訂單
+      operationId: getOrdersByStatus
+      parameters:
+        - name: status
+          in: path
+          required: true
+          description: 訂單狀態（PENDING, CONFIRMED, CANCELLED, COMPLETED）
+          schema:
+            type: string
+            enum: [PENDING, CONFIRMED, CANCELLED, COMPLETED]
+      responses:
+        '200':
+          description: 成功取得訂單列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /orders/{id}/convert/twd:
+    get:
+      tags:
+        - Orders
+      summary: 將訂單金額轉換為 TWD
+      description: 將指定訂單的最終金額轉換為新台幣（TWD）
+      operationId: convertOrderToTwd
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 訂單ID
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 轉換成功
+          content:
+            application/json:
+              schema:
+                type: number
+                format: double
+                example: 31250.00
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /orders/{id}/convert/{targetCurrency}:
+    get:
+      tags:
+        - Orders
+      summary: 將訂單金額轉換為指定幣別
+      description: 將指定訂單的最終金額轉換為目標幣別（轉換流程：訂單幣別 → TWD → 目標幣別）
+      operationId: convertOrderCurrency
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: 訂單ID
+          schema:
+            type: integer
+            format: int64
+        - name: targetCurrency
+          in: path
+          required: true
+          description: 目標幣別代碼（TWD, USD, EUR, JPY, CNY）
+          schema:
+            $ref: '#/components/schemas/CurrencyCode'
+      responses:
+        '200':
+          description: 轉換成功
+          content:
+            application/json:
+              schema:
+                type: number
+                format: double
+                example: 906.25
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /currencies:
+    get:
+      tags:
+        - Currencies
+      summary: 取得所有幣別
+      description: 取得所有幣別及其匯率資訊
+      operationId: getAllCurrencies
+      responses:
+        '200':
+          description: 成功取得幣別列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Currency'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - Currencies
+      summary: 建立新幣別
+      description: 建立新的幣別及其匯率資訊
+      operationId: createCurrency
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CurrencyInput'
+      responses:
+        '201':
+          description: 幣別建立成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Currency'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /currencies/{code}:
+    get:
+      tags:
+        - Currencies
+      summary: 根據幣別代碼取得幣別資訊
+      description: 取得指定幣別的匯率資訊
+      operationId: getCurrencyByCode
+      parameters:
+        - name: code
+          in: path
+          required: true
+          description: 幣別代碼（TWD, USD, EUR, JPY, CNY）
+          schema:
+            $ref: '#/components/schemas/CurrencyCode'
+      responses:
+        '200':
+          description: 成功取得幣別資訊
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Currency'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    put:
+      tags:
+        - Currencies
+      summary: 更新幣別資訊
+      description: 更新指定幣別的所有資訊
+      operationId: updateCurrency
+      parameters:
+        - name: code
+          in: path
+          required: true
+          description: 幣別代碼
+          schema:
+            $ref: '#/components/schemas/CurrencyCode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CurrencyInput'
+      responses:
+        '200':
+          description: 幣別更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Currency'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - Currencies
+      summary: 刪除幣別
+      description: 刪除指定幣別
+      operationId: deleteCurrency
+      parameters:
+        - name: code
+          in: path
+          required: true
+          description: 幣別代碼
+          schema:
+            $ref: '#/components/schemas/CurrencyCode'
+      responses:
+        '204':
+          description: 幣別刪除成功
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /currencies/{code}/rate:
+    put:
+      tags:
+        - Currencies
+      summary: 更新幣別匯率
+      description: 只更新指定幣別的匯率，不更新其他欄位
+      operationId: updateCurrencyRate
+      parameters:
+        - name: code
+          in: path
+          required: true
+          description: 幣別代碼
+          schema:
+            $ref: '#/components/schemas/CurrencyCode'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: number
+              format: double
+              example: 32.000000
+      responses:
+        '200':
+          description: 匯率更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Currency'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /currencies/convert:
+    post:
+      tags:
+        - Currencies
+      summary: 幣別轉換
+      description: 將金額從來源幣別轉換為目標幣別（轉換流程：來源幣別 → TWD → 目標幣別）
+      operationId: convertCurrency
+      parameters:
+        - name: amount
+          in: query
+          required: true
+          description: 要轉換的金額
+          schema:
+            type: number
+            format: double
+        - name: sourceCurrency
+          in: query
+          required: true
+          description: 來源幣別代碼
+          schema:
+            $ref: '#/components/schemas/CurrencyCode'
+        - name: targetCurrency
+          in: query
+          required: true
+          description: 目標幣別代碼
+          schema:
+            $ref: '#/components/schemas/CurrencyCode'
+      responses:
+        '200':
+          description: 轉換成功
+          content:
+            application/json:
+              schema:
+                type: number
+                format: double
+                example: 906.25
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  schemas:
+    Order:
+      type: object
+      properties:
+        orderId:
+          type: integer
+          format: int64
+          description: 訂單ID
+          example: 1
+        username:
+          type: string
+          description: 使用者名稱
+          example: user1
+        amount:
+          type: number
+          format: double
+          description: 訂單原始金額
+          example: 1000.00
+        currency:
+          $ref: '#/components/schemas/CurrencyCode'
+        status:
+          type: string
+          description: 訂單狀態
+          enum: [PENDING, CONFIRMED, CANCELLED, COMPLETED]
+          example: PENDING
+        discount:
+          type: number
+          format: double
+          description: 折扣百分比（0-100）
+          example: 10.00
+        finalAmount:
+          type: number
+          format: double
+          description: 最終金額（扣除折扣後）
+          example: 900.00
+        createdAt:
+          type: string
+          format: date-time
+          description: 建立時間
+          example: "2024-01-01T10:00:00"
+        updatedAt:
+          type: string
+          format: date-time
+          description: 更新時間
+          example: "2024-01-01T10:00:00"
+
+    OrderInput:
+      type: object
+      required:
+        - username
+        - amount
+        - currency
+      properties:
+        username:
+          type: string
+          description: 使用者名稱
+          example: user1
+        amount:
+          type: number
+          format: double
+          description: 訂單原始金額，必須大於0
+          example: 1000.00
+        currency:
+          $ref: '#/components/schemas/CurrencyCode'
+        status:
+          type: string
+          description: 訂單狀態，預設為 PENDING
+          enum: [PENDING, CONFIRMED, CANCELLED, COMPLETED]
+          example: PENDING
+        discount:
+          type: number
+          format: double
+          description: 折扣百分比（0-100），預設為 0
+          example: 10.00
+
+    Currency:
+      type: object
+      properties:
+        currencyCode:
+          $ref: '#/components/schemas/CurrencyCode'
+        rateToTwd:
+          type: number
+          format: double
+          description: 對 TWD 的匯率（1 單位該幣別 = RATE_TO_TWD TWD）
+          example: 31.250000
+        lastUpdate:
+          type: string
+          format: date-time
+          description: 最後更新時間
+          example: "2024-01-01T10:00:00"
+
+    CurrencyInput:
+      type: object
+      required:
+        - currencyCode
+        - rateToTwd
+      properties:
+        currencyCode:
+          $ref: '#/components/schemas/CurrencyCode'
+        rateToTwd:
+          type: number
+          format: double
+          description: 對 TWD 的匯率，必須大於0
+          example: 31.250000
+
+    CurrencyCode:
+      type: string
+      enum: [TWD, USD, EUR, JPY, CNY]
+      description: 幣別代碼
+      example: USD
+
+  responses:
+    BadRequest:
+      description: 請求參數錯誤或驗證失敗
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              timestamp:
+                type: string
+                format: date-time
+              status:
+                type: integer
+                example: 400
+              error:
+                type: string
+                example: Bad Request
+              message:
+                type: string
+                example: 金額不能為空
+              path:
+                type: string
+                example: /api/orders
+
+    NotFound:
+      description: 資源不存在
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              timestamp:
+                type: string
+                format: date-time
+              status:
+                type: integer
+                example: 404
+              error:
+                type: string
+                example: Not Found
+              message:
+                type: string
+                example: 訂單不存在
+              path:
+                type: string
+                example: /api/orders/999
+
+    InternalServerError:
+      description: 伺服器內部錯誤
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              timestamp:
+                type: string
+                format: date-time
+              status:
+                type: integer
+                example: 500
+              error:
+                type: string
+                example: Internal Server Error
+              message:
+                type: string
+                example: 伺服器內部錯誤
+              path:
+                type: string
+                example: /api/orders
+
+
+
