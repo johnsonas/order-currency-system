@@ -1,0 +1,177 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:  # 允許手動觸發
+
+env:
+  JAVA_VERSION: '17'
+  NODE_VERSION: '20'
+  MAVEN_OPTS: '-Dmaven.repo.local=.m2/repository'
+
+jobs:
+  # 後端 CI
+  backend-ci:
+    name: Backend CI
+    runs-on: ubuntu-latest
+    
+    services:
+      oracle:
+        image: gvenzl/oracle-free:latest
+        env:
+          ORACLE_PASSWORD: Oracle123
+          ORACLE_DATABASE: FREEPDB1
+        ports:
+          - 1521:1521
+        options: >-
+          --health-cmd "sqlplus -s sys/Oracle123@FREEPDB1 as sysdba <<< 'SELECT 1 FROM DUAL;' || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+          --health-start-period 60s
+      
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ env.JAVA_VERSION }}
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
+      - name: Run Maven verify (compile + test)
+        run: mvn clean verify
+        env:
+          SPRING_DATASOURCE_URL: jdbc:oracle:thin:@localhost:1521/FREEPDB1
+          SPRING_DATASOURCE_USERNAME: sys
+          SPRING_DATASOURCE_PASSWORD: Oracle123
+          SPRING_DATA_REDIS_HOST: localhost
+          SPRING_DATA_REDIS_PORT: 6379
+
+      - name: Generate JaCoCo coverage report
+        run: mvn jacoco:report
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./target/site/jacoco/jacoco.xml
+          flags: backend
+          name: backend-coverage
+        continue-on-error: true
+
+      - name: Build Docker image
+        run: |
+          docker build -t order-currency-backend:${{ github.sha }} .
+          docker tag order-currency-backend:${{ github.sha }} order-currency-backend:latest
+
+      - name: Test Docker image
+        run: |
+          docker run -d --name test-backend -p 8080:8080 order-currency-backend:${{ github.sha }}
+          sleep 30
+          curl -f http://localhost:8080/actuator/health || exit 1
+          docker stop test-backend
+          docker rm test-backend
+
+  # 前端 CI
+  frontend-ci:
+    name: Frontend CI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Lint code (可選)
+        working-directory: ./frontend
+        run: npm run lint || echo "Lint not configured"
+        continue-on-error: true
+
+      - name: Build frontend
+        working-directory: ./frontend
+        run: npm run build
+
+      - name: Build Docker image
+        run: |
+          docker build -f Dockerfile.frontend -t order-currency-frontend:${{ github.sha }} .
+          docker tag order-currency-frontend:${{ github.sha }} order-currency-frontend:latest
+
+      - name: Test Docker image
+        run: |
+          docker run -d --name test-frontend -p 80:80 order-currency-frontend:${{ github.sha }}
+          sleep 5
+          curl -f http://localhost/ || exit 1
+          docker stop test-frontend
+          docker rm test-frontend
+
+  # 安全掃描
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: [backend-ci, frontend-ci]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+        continue-on-error: true
+
+  # 總結
+  ci-summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [backend-ci, frontend-ci, security-scan]
+    if: always()
+
+    steps:
+      - name: CI Status
+        run: |
+          echo "Backend CI: ${{ needs.backend-ci.result }}"
+          echo "Frontend CI: ${{ needs.frontend-ci.result }}"
+          echo "Security Scan: ${{ needs.security-scan.result }}"
+
+
