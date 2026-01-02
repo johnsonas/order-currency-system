@@ -275,3 +275,161 @@ tr:hover {
   cursor: pointer;
 }
 
+/* 訊息通知樣式 */
+.notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  min-width: 350px;
+  max-width: 500px;
+  z-index: 10000;
+  animation: slideInRight 0.3s ease-out;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.notification:hover {
+  transform: translateX(-5px);
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.notification-content {
+  display: flex;
+  align-items: flex-start;
+  padding: 16px;
+  gap: 12px;
+}
+
+.notification-icon {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 14px;
+  color: white;
+}
+
+.notification.success .notification-icon {
+  background-color: #27ae60;
+}
+
+.notification.error .notification-icon {
+  background-color: #e74c3c;
+}
+
+.notification.info .notification-icon {
+  background-color: #3498db;
+}
+
+.notification.warning .notification-icon {
+  background-color: #f39c12;
+}
+
+.notification-message {
+  flex: 1;
+  min-width: 0;
+}
+
+.notification-title {
+  font-weight: 600;
+  font-size: 16px;
+  margin-bottom: 4px;
+}
+
+.notification.success .notification-title {
+  color: #27ae60;
+}
+
+.notification.error .notification-title {
+  color: #e74c3c;
+}
+
+.notification.info .notification-title {
+  color: #3498db;
+}
+
+.notification.warning .notification-title {
+  color: #f39c12;
+}
+
+.notification-detail {
+  font-size: 14px;
+  color: #555;
+  line-height: 1.5;
+  margin-top: 4px;
+}
+
+.notification-field-errors {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.notification-field-errors ul {
+  margin: 0;
+  padding-left: 20px;
+  list-style-type: disc;
+}
+
+.notification-field-errors li {
+  font-size: 13px;
+  color: #666;
+  margin: 4px 0;
+  line-height: 1.4;
+}
+
+.notification-field-errors strong {
+  color: #333;
+}
+
+.notification-close {
+  flex-shrink: 0;
+  font-size: 20px;
+  font-weight: bold;
+  color: #999;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+  transition: color 0.2s;
+}
+
+.notification-close:hover {
+  color: #333;
+}
+
+.notification.success {
+  background-color: #d4edda;
+  border-left: 4px solid #27ae60;
+}
+
+.notification.error {
+  background-color: #f8d7da;
+  border-left: 4px solid #e74c3c;
+}
+
+.notification.info {
+  background-color: #d1ecf1;
+  border-left: 4px solid #3498db;
+}
+
+.notification.warning {
+  background-color: #fff3cd;
+  border-left: 4px solid #f39c12;
+}
+

@@ -42,10 +42,9 @@ public class OrderController {
     
     @GetMapping("/{id}")
     public ResponseEntity<Order> getOrderById(@PathVariable Long id) {
-
-            Optional<Order> order = orderService.getOrderById(id);
-            return order.map(ResponseEntity::ok)
-                        .orElse(ResponseEntity.notFound().build());
+        Optional<Order> order = orderService.getOrderById(id);
+        return order.map(ResponseEntity::ok)
+                    .orElse(ResponseEntity.notFound().build());
     }
     
 
@@ -69,12 +68,8 @@ public class OrderController {
     
     @PutMapping("/{id}")
     public ResponseEntity<Order> updateOrder(@PathVariable Long id, @Valid @RequestBody Order order) {
-        try {
-            Order updatedOrder = orderService.updateOrder(id, order);
-            return ResponseEntity.ok(updatedOrder);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+        Order updatedOrder = orderService.updateOrder(id, order);
+        return ResponseEntity.ok(updatedOrder);
     }
     
     @DeleteMapping("/{id}")
@@ -85,28 +80,20 @@ public class OrderController {
     
     @GetMapping("/{id}/convert/twd")
     public ResponseEntity<BigDecimal> convertToTwd(@PathVariable Long id) {
-        try {
-            BigDecimal twdAmount = orderService.convertToTwd(id);
-            return ResponseEntity.ok(twdAmount);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+        BigDecimal twdAmount = orderService.convertToTwd(id);
+        return ResponseEntity.ok(twdAmount);
     }
     
     @GetMapping("/{id}/convert/{targetCurrency}")
     public ResponseEntity<BigDecimal> convertCurrency(
             @PathVariable Long id,
             @PathVariable String targetCurrency) {
-        try {
-            CurrencyCode currencyCode = CurrencyCode.fromCode(targetCurrency);
-            if (currencyCode == null) {
-                return ResponseEntity.badRequest().build();
-            }
-            BigDecimal convertedAmount = orderService.convertCurrency(id, currencyCode);
-            return ResponseEntity.ok(convertedAmount);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
+        CurrencyCode currencyCode = CurrencyCode.fromCode(targetCurrency);
+        if (currencyCode == null) {
+            throw new com.example.ordersystem.exception.BadRequestException("無效的幣別代碼: " + targetCurrency);
         }
+        BigDecimal convertedAmount = orderService.convertCurrency(id, currencyCode);
+        return ResponseEntity.ok(convertedAmount);
     }
 
 

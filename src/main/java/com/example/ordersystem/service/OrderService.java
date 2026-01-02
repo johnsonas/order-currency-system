@@ -1,5 +1,6 @@
 package com.example.ordersystem.service;
 
+import com.example.ordersystem.exception.OrderNotFoundException;
 import com.example.ordersystem.model.CurrencyCode;
 import com.example.ordersystem.model.Order;
 import com.example.ordersystem.repository.OrderRepository;
@@ -179,7 +180,7 @@ public class OrderService {
      * @param orderId 要更新的訂單ID
      * @param orderDetails 包含更新資料的訂單物件
      * @return 更新後的訂單物件
-     * @throws RuntimeException 如果訂單不存在
+     * @throws OrderNotFoundException 如果訂單不存在
      */
     public Order updateOrder(Long orderId, Order orderDetails) {
         Optional<Order> optionalOrder = orderRepository.findById(orderId);
@@ -193,7 +194,7 @@ public class OrderService {
             calculateFinalAmount(order);
             return orderRepository.save(order);
         }
-        throw new RuntimeException("訂單不存在: " + orderId);
+        throw new OrderNotFoundException(orderId);
     }
     
     /**
@@ -230,7 +231,7 @@ public class OrderService {
      * 
      * @param orderId 訂單ID
      * @return 轉換後的新台幣金額（保留2位小數）
-     * @throws RuntimeException 如果訂單不存在
+     * @throws OrderNotFoundException 如果訂單不存在
      */
     public BigDecimal convertToTwd(Long orderId) {
         Optional<Order> optionalOrder = orderRepository.findById(orderId);
@@ -238,7 +239,7 @@ public class OrderService {
             Order order = optionalOrder.get();
             return currencyService.convertToTwd(order.getFinalAmount(), order.getCurrency());
         }
-        throw new RuntimeException("訂單不存在: " + orderId);
+        throw new OrderNotFoundException(orderId);
     }
     
     /**
@@ -248,7 +249,7 @@ public class OrderService {
      * @param orderId 訂單ID
      * @param targetCurrency 目標幣別代碼 Enum（如：USD, EUR, JPY）
      * @return 轉換後的目標幣別金額（保留2位小數）
-     * @throws RuntimeException 如果訂單不存在或目標幣別不存在
+     * @throws OrderNotFoundException 如果訂單不存在
      */
     public BigDecimal convertCurrency(Long orderId, CurrencyCode targetCurrency) {
         Optional<Order> optionalOrder = orderRepository.findById(orderId);
@@ -258,7 +259,7 @@ public class OrderService {
             CurrencyCode sourceCurrency = order.getCurrency();
             return currencyService.convertCurrency(amount, sourceCurrency, targetCurrency);
         }
-        throw new RuntimeException("訂單不存在: " + orderId);
+        throw new OrderNotFoundException(orderId);
     }
 
 

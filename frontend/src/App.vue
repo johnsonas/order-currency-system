@@ -34,6 +34,29 @@
         </nav>
       </div>
 
+      <!-- 訊息通知 -->
+      <div v-if="notification.show" :class="['notification', notification.type]" @click="closeNotification">
+        <div class="notification-content">
+          <span class="notification-icon">
+            <span v-if="notification.type === 'success'">✓</span>
+            <span v-else-if="notification.type === 'error'">✕</span>
+            <span v-else>ℹ</span>
+          </span>
+          <div class="notification-message">
+            <div class="notification-title">{{ notification.title }}</div>
+            <div v-if="notification.message" class="notification-detail">{{ notification.message }}</div>
+            <div v-if="notification.fieldErrors && notification.fieldErrors.length > 0" class="notification-field-errors">
+              <ul>
+                <li v-for="(fieldError, index) in notification.fieldErrors" :key="index">
+                  <strong>{{ fieldError.field }}:</strong> {{ fieldError.message }}
+                </li>
+              </ul>
+            </div>
+          </div>
+          <span class="notification-close" @click.stop="closeNotification">&times;</span>
+        </div>
+      </div>
+
       <!-- 主內容區 -->
       <div class="main-content">
         <!-- 幣別轉換頁面 -->
@@ -334,7 +357,16 @@ export default {
       totalElements: 0,
       // 匯率編輯相關
       editingRates: {},  // 儲存正在編輯的匯率 { currencyCode: rate }
-      autoUpdateEnabled: true  // 自動更新開關狀態
+      autoUpdateEnabled: true,  // 自動更新開關狀態
+      // 訊息通知
+      notification: {
+        show: false,
+        type: 'info', // 'success', 'error', 'info', 'warning'
+        title: '',
+        message: '',
+        fieldErrors: []
+      },
+      notificationTimer: null
     }
   },
   mounted() {
@@ -342,6 +374,42 @@ export default {
     this.loadCurrencies()
   },
   methods: {
+    // 訊息通知相關方法
+    showNotification(type, title, message = '', fieldErrors = []) {
+      this.notification = {
+        show: true,
+        type: type,
+        title: title,
+        message: message,
+        fieldErrors: fieldErrors
+      }
+      // 自動關閉通知（錯誤訊息顯示 8 秒，成功訊息顯示 5 秒）
+      if (this.notificationTimer) {
+        clearTimeout(this.notificationTimer)
+      }
+      const duration = type === 'error' ? 8000 : 5000
+      this.notificationTimer = setTimeout(() => {
+        this.closeNotification()
+      }, duration)
+    },
+    closeNotification() {
+      this.notification.show = false
+      if (this.notificationTimer) {
+        clearTimeout(this.notificationTimer)
+        this.notificationTimer = null
+      }
+    },
+    // 解析錯誤響應
+    parseError(error) {
+      if (error.response && error.response.data) {
+        const errorData = error.response.data
+        // 後端返回的 ErrorResponse 格式
+        const message = errorData.message || errorData.error || '發生未知錯誤'
+        const fieldErrors = errorData.fieldErrors || []
+        return { message, fieldErrors }
+      }
+      return { message: error.message || '網路連線錯誤，請稍後再試', fieldErrors: [] }
+    },
     changePage(page) {
       // 如果點擊的是當前頁面，不執行任何操作，避免重複載入
       if (this.currentPage === page) {
@@ -387,7 +455,8 @@ export default {
         }
       } catch (error) {
         console.error('載入訂單失敗:', error)
-        alert('載入訂單失敗')
+        const { message } = this.parseError(error)
+        this.showNotification('error', '載入訂單失敗', message)
       }
     },
     debounceSearch() {
@@ -430,16 +499,18 @@ export default {
         this.convertedResult = response.data
       } catch (error) {
         console.error('幣別換算失敗:', error)
-        alert('幣別換算失敗')
+        const { message, fieldErrors } = this.parseError(error)
+        this.showNotification('error', '幣別換算失敗', message, fieldErrors)
       }
     },
     async convertOrderToTwd(orderId) {
       try {
         const response = await axios.get(`${API_BASE_URL}/orders/${orderId}/convert/twd`)
-        alert(`轉換為 ${CurrencyCode.TWD}: ${response.data.toFixed(2)}`)
+        this.showNotification('success', '轉換成功', `轉換為 ${CurrencyCode.TWD}: ${response.data.toFixed(2)}`)
       } catch (error) {
         console.error('轉換失敗:', error)
-        alert('轉換失敗')
+        const { message, fieldErrors } = this.parseError(error)
+        this.showNotification('error', '轉換失敗', message, fieldErrors)
       }
     },
     openAddModal() {
@@ -478,9 +549,11 @@ export default {
         this.closeModal()
         // 重新載入當前頁面的資料
         this.loadOrders(this.searchOrderId, this.currentPageNumber, this.pageSize)
+        this.showNotification('success', '儲存成功', '訂單已成功儲存')
       } catch (error) {
         console.error('儲存訂單失敗:', error)
-        alert('儲存訂單失敗')
+        const { message, fieldErrors } = this.parseError(error)
+        this.showNotification('error', '儲存訂單失敗', message, fieldErrors)
       }
     },
     async deleteOrder(orderId) {
@@ -489,9 +562,11 @@ export default {
           await axios.delete(`${API_BASE_URL}/orders/${orderId}`)
           // 重新載入當前頁面的資料
           this.loadOrders(this.searchOrderId, this.currentPageNumber, this.pageSize)
+          this.showNotification('success', '刪除成功', '訂單已成功刪除')
         } catch (error) {
           console.error('刪除訂單失敗:', error)
-          alert('刪除訂單失敗')
+          const { message, fieldErrors } = this.parseError(error)
+          this.showNotification('error', '刪除訂單失敗', message, fieldErrors)
         }
       }
     },
@@ -524,7 +599,7 @@ export default {
     async saveRate(currencyCode) {
       const newRate = this.editingRates[currencyCode]
       if (newRate === undefined || newRate === null || newRate <= 0) {
-        alert('匯率必須大於 0')
+        this.showNotification('error', '輸入錯誤', '匯率必須大於 0')
         return
       }
       
@@ -537,10 +612,11 @@ export default {
         delete this.editingRates[currencyCode]
         // 重新載入匯率資料
         await this.loadCurrencies()
-        alert('匯率更新成功！')
+        this.showNotification('success', '更新成功', '匯率已成功更新')
       } catch (error) {
         console.error('更新匯率失敗:', error)
-        alert('更新匯率失敗：' + (error.response?.data?.message || error.message))
+        const { message, fieldErrors } = this.parseError(error)
+        this.showNotification('error', '更新匯率失敗', message, fieldErrors)
       }
     },
     async refreshRatesFromApi() {
@@ -550,12 +626,13 @@ export default {
       
       try {
         const response = await axios.post(`${API_BASE_URL}/currencies/refresh`)
-        alert('匯率更新成功！已從 ExchangeRate-API 取得最新匯率。')
+        this.showNotification('success', '更新成功', '已從 ExchangeRate-API 取得最新匯率')
         // 重新載入匯率資料
         await this.loadCurrencies()
       } catch (error) {
         console.error('更新匯率失敗:', error)
-        alert('更新匯率失敗：' + (error.response?.data?.message || error.message))
+        const { message, fieldErrors } = this.parseError(error)
+        this.showNotification('error', '更新匯率失敗', message, fieldErrors)
       }
     },
     formatDateTime(dateTimeString) {
@@ -589,19 +666,20 @@ export default {
         if (this.autoUpdateEnabled) {
           // 啟用自動更新
           const response = await axios.post(`${API_BASE_URL}/currencies/auto-update/enable`)
-          alert(response.data.message)
+          this.showNotification('success', '操作成功', response.data.message || '自動更新已啟用')
           // 重新載入匯率資料
           await this.loadCurrencies()
         } else {
           // 停用自動更新
           const response = await axios.post(`${API_BASE_URL}/currencies/auto-update/disable`)
-          alert(response.data.message)
+          this.showNotification('success', '操作成功', response.data.message || '自動更新已停用')
         }
       } catch (error) {
         console.error('切換自動更新狀態失敗:', error)
         // 恢復原狀態
         this.autoUpdateEnabled = !this.autoUpdateEnabled
-        alert('切換自動更新狀態失敗：' + (error.response?.data?.message || error.message))
+        const { message, fieldErrors } = this.parseError(error)
+        this.showNotification('error', '操作失敗', message, fieldErrors)
       }
     }
   },

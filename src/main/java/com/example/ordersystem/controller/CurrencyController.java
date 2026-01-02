@@ -1,5 +1,6 @@
 package com.example.ordersystem.controller;
 
+import com.example.ordersystem.exception.BadRequestException;
 import com.example.ordersystem.model.Currency;
 import com.example.ordersystem.model.CurrencyCode;
 import com.example.ordersystem.scheduler.CurrencyRateUpdateScheduler;
@@ -40,7 +41,7 @@ public class CurrencyController {
     public ResponseEntity<Currency> getCurrencyByCode(@PathVariable String code) {
         CurrencyCode currencyCode = CurrencyCode.fromCode(code);
         if (currencyCode == null) {
-            return ResponseEntity.badRequest().build();
+            throw new BadRequestException("無效的幣別代碼: " + code);
         }
         Optional<Currency> currency = currencyService.getCurrencyByCode(currencyCode);
         return currency.map(ResponseEntity::ok)
@@ -59,7 +60,7 @@ public class CurrencyController {
             @Valid @RequestBody Currency currency) {
         CurrencyCode currencyCode = CurrencyCode.fromCode(code);
         if (currencyCode == null) {
-            return ResponseEntity.badRequest().build();
+            throw new BadRequestException("無效的幣別代碼: " + code);
         }
         currency.setCurrencyCode(currencyCode);
         Currency updatedCurrency = currencyService.createOrUpdateCurrency(currency);
@@ -70,23 +71,19 @@ public class CurrencyController {
     public ResponseEntity<Currency> updateRate(
             @PathVariable String code,
             @RequestBody BigDecimal newRate) {
-        try {
-            CurrencyCode currencyCode = CurrencyCode.fromCode(code);
-            if (currencyCode == null) {
-                return ResponseEntity.badRequest().build();
-            }
-            Currency updatedCurrency = currencyService.updateRate(currencyCode, newRate);
-            return ResponseEntity.ok(updatedCurrency);
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
+        CurrencyCode currencyCode = CurrencyCode.fromCode(code);
+        if (currencyCode == null) {
+            throw new BadRequestException("無效的幣別代碼: " + code);
         }
+        Currency updatedCurrency = currencyService.updateRate(currencyCode, newRate);
+        return ResponseEntity.ok(updatedCurrency);
     }
     
     @DeleteMapping("/{code}")
     public ResponseEntity<Void> deleteCurrency(@PathVariable String code) {
         CurrencyCode currencyCode = CurrencyCode.fromCode(code);
         if (currencyCode == null) {
-            return ResponseEntity.badRequest().build();
+            throw new BadRequestException("無效的幣別代碼: " + code);
         }
         currencyService.deleteCurrency(currencyCode);
         return ResponseEntity.noContent().build();
@@ -97,17 +94,15 @@ public class CurrencyController {
             @RequestParam BigDecimal amount,
             @RequestParam String sourceCurrency,
             @RequestParam String targetCurrency) {
-        try {
-            CurrencyCode source = CurrencyCode.fromCode(sourceCurrency);
-            CurrencyCode target = CurrencyCode.fromCode(targetCurrency);
-            if (source == null || target == null) {
-                return ResponseEntity.badRequest().build();
-            }
-            BigDecimal convertedAmount = currencyService.convertCurrency(amount, source, target);
-            return ResponseEntity.ok(convertedAmount);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().build();
+        CurrencyCode source = CurrencyCode.fromCode(sourceCurrency);
+        CurrencyCode target = CurrencyCode.fromCode(targetCurrency);
+        if (source == null || target == null) {
+            throw new BadRequestException(
+                String.format("無效的幣別代碼: sourceCurrency=%s, targetCurrency=%s", 
+                    sourceCurrency, targetCurrency));
         }
+        BigDecimal convertedAmount = currencyService.convertCurrency(amount, source, target);
+        return ResponseEntity.ok(convertedAmount);
     }
 
     /**
