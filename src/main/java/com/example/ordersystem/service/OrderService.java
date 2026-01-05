@@ -51,13 +51,31 @@ public class OrderService {
      * @return 分頁的訂單列表，按建立時間降序排列
      */
     public Page<Order> getAllOrders(Pageable pageable) {
-        return orderRepository.findAll(
-            org.springframework.data.domain.PageRequest.of(
-                pageable.getPageNumber(),
-                pageable.getPageSize(),
-                Sort.by(Sort.Direction.DESC, "createdAt")
-            )
+        // 創建帶排序的 Pageable，按建立時間降序
+        Pageable sortedPageable = org.springframework.data.domain.PageRequest.of(
+            pageable.getPageNumber(),
+            pageable.getPageSize(),
+            Sort.by(Sort.Direction.DESC, "createdAt")
         );
+        return orderRepository.findAll(sortedPageable);
+    }
+    
+    /**
+     * 根據用戶名取得訂單列表（分頁）
+     * 按照建立時間降序排列（最新的訂單在前）
+     * 
+     * @param username 用戶名
+     * @param pageable 分頁參數
+     * @return 分頁的訂單列表，按建立時間降序排列
+     */
+    public Page<Order> getOrdersByUsername(String username, Pageable pageable) {
+        // 創建帶排序的 Pageable，按建立時間降序
+        Pageable sortedPageable = org.springframework.data.domain.PageRequest.of(
+            pageable.getPageNumber(),
+            pageable.getPageSize(),
+            Sort.by(Sort.Direction.DESC, "createdAt")
+        );
+        return orderRepository.findByUsername(username, sortedPageable);
     }
     
     /**
@@ -157,6 +175,41 @@ public class OrderService {
         
         // 模糊搜尋（部分匹配）
         return orderRepository.searchByOrderIdContaining(trimmedId, pageable);
+    }
+    
+    /**
+     * 根據訂單ID和用戶名搜尋訂單（分頁）
+     * 
+     * @param orderId 訂單ID（可以是部分匹配）
+     * @param username 用戶名
+     * @param pageable 分頁參數
+     * @return 分頁的訂單列表
+     */
+    public Page<Order> searchOrdersByOrderIdAndUsername(String orderId, String username, Pageable pageable) {
+        String trimmedId = orderId.trim();
+        if (trimmedId.isEmpty()) {
+            return getOrdersByUsername(username, pageable);
+        }
+        
+        // 先嘗試精確匹配（如果是完整數字）
+        try {
+            Long exactId = Long.parseLong(trimmedId);
+            Optional<Order> exactOrder = orderRepository.findByOrderId(exactId);
+            if (exactOrder.isPresent() && exactOrder.get().getUsername().equals(username)) {
+                // 返回單一結果的分頁物件
+                List<Order> singleOrder = List.of(exactOrder.get());
+                return new org.springframework.data.domain.PageImpl<>(
+                    singleOrder, 
+                    pageable, 
+                    1
+                );
+            }
+        } catch (NumberFormatException e) {
+            // 如果不是數字，使用模糊搜尋
+        }
+        
+        // 模糊搜尋（部分匹配），並過濾用戶名
+        return orderRepository.searchByOrderIdContainingAndUsername(trimmedId, username, pageable);
     }
     
     /**

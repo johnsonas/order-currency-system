@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -49,12 +50,14 @@ public class CurrencyController {
     }
     
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Currency> createCurrency(@Valid @RequestBody Currency currency) {
         Currency createdCurrency = currencyService.createOrUpdateCurrency(currency);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdCurrency);
     }
     
     @PutMapping("/{code}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Currency> updateCurrency(
             @PathVariable String code,
             @Valid @RequestBody Currency currency) {
@@ -68,6 +71,7 @@ public class CurrencyController {
     }
     
     @PutMapping("/{code}/rate")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Currency> updateRate(
             @PathVariable String code,
             @RequestBody BigDecimal newRate) {
@@ -80,6 +84,7 @@ public class CurrencyController {
     }
     
     @DeleteMapping("/{code}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteCurrency(@PathVariable String code) {
         CurrencyCode currencyCode = CurrencyCode.fromCode(code);
         if (currencyCode == null) {
@@ -110,6 +115,7 @@ public class CurrencyController {
      * 從 ExchangeRate-API 取得最新匯率並更新資料庫和 Redis
      */
     @PostMapping("/refresh")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, String>> refreshRates() {
         logger.info("收到手動觸發匯率更新請求");
         try {
@@ -139,6 +145,7 @@ public class CurrencyController {
      * 取得自動更新狀態
      */
     @GetMapping("/auto-update/status")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, Object>> getAutoUpdateStatus() {
         Map<String, Object> response = new HashMap<>();
         response.put("enabled", currencyRateUpdateScheduler.isAutoUpdateEnabled());
@@ -150,6 +157,7 @@ public class CurrencyController {
      * 會立即執行一次更新，然後啟動每小時的排程任務
      */
     @PostMapping("/auto-update/enable")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, String>> enableAutoUpdate() {
         logger.info("收到啟用自動更新請求");
         try {
@@ -179,6 +187,7 @@ public class CurrencyController {
      * 停用自動更新
      */
     @PostMapping("/auto-update/disable")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, String>> disableAutoUpdate() {
         logger.info("收到停用自動更新請求");
         try {

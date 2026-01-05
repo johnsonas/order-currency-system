@@ -161,8 +161,11 @@ public class GlobalExceptionHandler {
             request.getRequestURI()
         );
         
-        // 在開發環境可以返回詳細錯誤訊息
-        // errorResponse.setMessage(ex.getMessage());
+        // 在開發環境返回詳細錯誤訊息，方便調試
+        String detailMessage = ex.getMessage();
+        if (detailMessage != null && !detailMessage.isEmpty()) {
+            errorResponse.setMessage("伺服器內部錯誤: " + detailMessage);
+        }
         
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
     }

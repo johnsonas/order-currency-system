@@ -31,6 +31,13 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
            countQuery = "SELECT COUNT(*) FROM ORDERS WHERE TO_CHAR(ORDER_ID) LIKE '%' || :orderId || '%'", 
            nativeQuery = true)
     Page<Order> searchByOrderIdContaining(@Param("orderId") String orderId, Pageable pageable);
+    
+    Page<Order> findByUsername(String username, Pageable pageable);
+    
+    @Query(value = "SELECT * FROM ORDERS WHERE TO_CHAR(ORDER_ID) LIKE '%' || :orderId || '%' AND USERNAME = :username ORDER BY CREATED_AT DESC", 
+           countQuery = "SELECT COUNT(*) FROM ORDERS WHERE TO_CHAR(ORDER_ID) LIKE '%' || :orderId || '%' AND USERNAME = :username", 
+           nativeQuery = true)
+    Page<Order> searchByOrderIdContainingAndUsername(@Param("orderId") String orderId, @Param("username") String username, Pageable pageable);
 }
 
 

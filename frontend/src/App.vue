@@ -1,37 +1,43 @@
 <template>
   <div id="app">
-    <div class="app-container">
+    <!-- 登入頁面 -->
+    <Login v-if="!isAuthenticated" :onLoginSuccess="handleLoginSuccess" />
+    
+    <!-- 主應用程式 -->
+    <div v-else class="app-container">
       <!-- 左側選單 -->
       <div class="sidebar">
         <div class="sidebar-header">
           <h1>訂單與幣別轉換系統</h1>
+          <div class="user-info">
+            <span class="username">{{ currentUsername }}</span>
+            <button class="btn-logout" @click="handleLogout">登出</button>
+          </div>
         </div>
         <nav class="sidebar-menu">
           <div 
+            v-for="menuItem in menuItems" 
+            :key="menuItem.id"
             class="menu-item" 
-            :class="{ active: currentPage === 'orders' }"
-            @click="changePage('orders')"
+            :class="{ active: currentPage === menuItem.route }"
+            @click="changePage(menuItem.route)"
           >
-            <span class="menu-icon">📋</span>
-            <span class="menu-text">訂單列表</span>
-          </div>
-          <div 
-            class="menu-item" 
-            :class="{ active: currentPage === 'currency' }"
-            @click="changePage('currency')"
-          >
-            <span class="menu-icon">💱</span>
-            <span class="menu-text">幣別轉換系統</span>
-          </div>
-          <div 
-            class="menu-item" 
-            :class="{ active: currentPage === 'rates' }"
-            @click="changePage('rates')"
-          >
-            <span class="menu-icon">📊</span>
-            <span class="menu-text">匯率管理</span>
+            <span class="menu-icon">{{ menuItem.icon }}</span>
+            <span class="menu-text">{{ menuItem.label }}</span>
           </div>
         </nav>
+      </div>
+
+      <!-- 確認對話框 -->
+      <div v-if="confirmDialog.show" class="modal" @click.self="cancelConfirm">
+        <div class="modal-content" style="max-width: 400px;">
+          <h3 style="margin-top: 0; margin-bottom: 15px;">{{ confirmDialog.title }}</h3>
+          <p style="margin-bottom: 20px; color: #666;">{{ confirmDialog.message }}</p>
+          <div style="display: flex; gap: 10px; justify-content: flex-end;">
+            <button class="btn-secondary" @click="cancelConfirm">取消</button>
+            <button class="btn-danger" @click="executeConfirm">確定</button>
+          </div>
+        </div>
       </div>
 
       <!-- 訊息通知 -->
@@ -276,39 +282,188 @@
     <!-- 新增/編輯訂單 Modal -->
     <div v-if="showModal" class="modal" @click.self="closeModal">
       <div class="modal-content">
-        <span class="close" @click="closeModal">&times;</span>
-        <h2>{{ isEditMode ? '編輯訂單' : '新增訂單' }}</h2>
-        <div class="form-group">
-          <label>使用者名稱：</label>
-          <input type="text" v-model="currentOrder.username" />
+        <div class="modal-header">
+          <h2>{{ isEditMode ? '編輯訂單' : '新增訂單' }}</h2>
+          <span class="close" @click="closeModal">&times;</span>
         </div>
-        <div class="form-group">
-          <label>金額：</label>
-          <input type="number" v-model.number="currentOrder.amount" step="0.01" />
+        
+        <div class="modal-body">
+          <Form @submit="onSubmit" :validation-schema="typedOrderSchema" v-slot="{ errors, meta, values, resetForm }">
+          <!-- 表單狀態指示器 -->
+          <div class="form-status-indicator" :class="{ 'valid': meta.valid && meta.touched, 'invalid': !meta.valid && meta.touched }">
+            <span v-if="meta.valid && meta.touched" class="status-icon">✓</span>
+            <span v-else-if="!meta.valid && meta.touched" class="status-icon">⚠</span>
+            <span class="status-text">
+              <span v-if="meta.valid && meta.touched">表單驗證通過</span>
+              <span v-else-if="!meta.valid && meta.touched">請檢查表單欄位</span>
+              <span v-else>請填寫表單</span>
+            </span>
+          </div>
+
+          <div class="form-group">
+            <label>使用者名稱：<span class="required">*</span></label>
+            <div class="input-wrapper">
+              <Field 
+                name="username" 
+                type="text" 
+                v-model="currentOrder.username"
+                :disabled="!isAdmin && !isEditMode"
+                :readonly="!isAdmin && !isEditMode"
+                :class="{ 'error': errors.username, 'success': !errors.username && meta.touched && values.username }"
+                placeholder="輸入使用者名稱"
+                @input="filterUsernameSuggestions"
+              />
+              <span v-if="!errors.username && meta.touched && values.username" class="input-icon success-icon">✓</span>
+              <span v-if="errors.username" class="input-icon error-icon">✕</span>
+            </div>
+            <ErrorMessage name="username" class="error-message" />
+            <!-- 使用者名稱建議 -->
+            <div v-if="usernameSuggestions.length > 0 && !currentOrder.username" class="suggestions-box">
+              <div 
+                v-for="suggestion in usernameSuggestions" 
+                :key="suggestion"
+                class="suggestion-item"
+                @click="selectUsername(suggestion)"
+              >
+                {{ suggestion }}
+              </div>
+            </div>
+            <small v-if="!isAdmin && !isEditMode" style="color: #666; display: block; margin-top: 5px;">
+              將使用您的帳號：{{ currentUsername }}
+            </small>
+          </div>
+          
+          <div class="form-group">
+            <label>金額：<span class="required">*</span></label>
+            <div class="input-wrapper">
+              <Field 
+                name="amount" 
+                type="number" 
+                v-model.number="currentOrder.amount"
+                @input="handleAmountInput"
+                :class="{ 'error': errors.amount, 'success': !errors.amount && meta.touched && currentOrder.amount }"
+                placeholder="0.00"
+                step="0.01"
+              />
+              <span v-if="!errors.amount && meta.touched && currentOrder.amount" class="input-icon success-icon">✓</span>
+              <span v-if="errors.amount" class="input-icon error-icon">✕</span>
+            </div>
+            <div v-if="currentOrder.amount" class="formatted-amount-display">
+              格式化顯示：{{ formatNumber(currentOrder.amount) }}
+            </div>
+            <ErrorMessage name="amount" class="error-message" />
+            <small style="color: #666; display: block; margin-top: 5px;">
+              請輸入大於 0 的金額
+            </small>
+          </div>
+          
+          <div class="form-group">
+            <label>幣別：<span class="required">*</span></label>
+            <div class="input-wrapper">
+              <Field 
+                name="currency" 
+                as="select"
+                v-model="currentOrder.currency"
+                :class="{ 'error': errors.currency, 'success': !errors.currency && meta.touched && currentOrder.currency }"
+              >
+                <option value="">請選擇幣別</option>
+                <option v-for="currency in currencies" :key="currency.currencyCode" :value="currency.currencyCode">
+                  {{ currency.currencyCode }} - {{ getCurrencyName(currency.currencyCode) }}
+                </option>
+              </Field>
+              <span v-if="!errors.currency && meta.touched && currentOrder.currency" class="input-icon success-icon">✓</span>
+              <span v-if="errors.currency" class="input-icon error-icon">✕</span>
+            </div>
+            <ErrorMessage name="currency" class="error-message" />
+          </div>
+          
+          <div class="form-group">
+            <label>折扣 (%)：</label>
+            <div class="input-wrapper">
+              <Field 
+                name="discount" 
+                type="number" 
+                v-model.number="currentOrder.discount"
+                @input="handleDiscountInput"
+                step="0.01"
+                min="0"
+                max="100"
+                :class="{ 'error': errors.discount, 'success': !errors.discount && meta.touched && currentOrder.discount !== undefined }"
+                placeholder="0"
+              />
+              <span v-if="!errors.discount && meta.touched && currentOrder.discount !== undefined" class="input-icon success-icon">✓</span>
+              <span v-if="errors.discount" class="input-icon error-icon">✕</span>
+            </div>
+            <ErrorMessage name="discount" class="error-message" />
+            <!-- 折扣滑桿 -->
+            <div class="discount-slider-wrapper">
+              <input 
+                type="range" 
+                v-model.number="currentOrder.discount"
+                @input="handleDiscountSlider"
+                min="0" 
+                max="100" 
+                step="1"
+                class="discount-slider"
+              />
+              <div class="discount-labels">
+                <span>0%</span>
+                <span>50%</span>
+                <span>100%</span>
+              </div>
+            </div>
+            <small style="color: #666; display: block; margin-top: 5px;">
+              折扣範圍：0% - 100%（不能為負數）
+            </small>
+            <div v-if="currentOrder.discount < 0 || currentOrder.discount > 100" class="discount-warning">
+              ⚠️ 折扣必須在 0% 到 100% 之間
+            </div>
+          </div>
+          
+          <!-- 即時計算預覽 -->
+          <div v-if="currentOrder.amount && currentOrder.currency" class="calculation-preview">
+            <div class="preview-item">
+              <span class="preview-label">原始金額：</span>
+              <span class="preview-value">{{ formatCurrency(currentOrder.amount, currentOrder.currency) }}</span>
+            </div>
+            <div v-if="currentOrder.discount > 0" class="preview-item">
+              <span class="preview-label">折扣 ({{ currentOrder.discount }}%)：</span>
+              <span class="preview-value discount-value">-{{ formatCurrency(calculateDiscount(), currentOrder.currency) }}</span>
+            </div>
+            <div class="preview-item preview-total">
+              <span class="preview-label">最終金額：</span>
+              <span class="preview-value total-value">{{ formatCurrency(calculateFinalAmount(), currentOrder.currency) }}</span>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label>狀態：<span class="required">*</span></label>
+            <div class="status-buttons">
+              <button
+                type="button"
+                v-for="statusOption in statusOptions"
+                :key="statusOption.value"
+                @click="currentOrder.status = statusOption.value"
+                :class="['status-btn', { 'active': currentOrder.status === statusOption.value, 'error': errors.status && meta.touched }]"
+              >
+                <span class="status-icon">{{ statusOption.icon }}</span>
+                <span>{{ statusOption.label }}</span>
+              </button>
+            </div>
+            <Field name="status" v-model="currentOrder.status" style="display: none;" />
+            <ErrorMessage name="status" class="error-message" />
+          </div>
+          
+          <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+            <button type="button" class="btn-secondary" @click="resetOrderForm(resetForm)">重置</button>
+            <button type="button" class="btn-secondary" @click="closeModal">取消</button>
+            <button type="submit" class="btn-success" :disabled="!meta.valid">
+              <span v-if="meta.valid">✓ 儲存</span>
+              <span v-else>儲存 (請完成表單)</span>
+            </button>
+          </div>
+        </Form>
         </div>
-        <div class="form-group">
-          <label>幣別：</label>
-          <select v-model="currentOrder.currency">
-            <option v-for="currency in currencies" :key="currency.currencyCode" :value="currency.currencyCode">
-              {{ currency.currencyCode }}
-            </option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>折扣 (%)：</label>
-          <input type="number" v-model.number="currentOrder.discount" step="0.01" min="0" max="100" />
-        </div>
-        <div class="form-group">
-          <label>狀態：</label>
-          <select v-model="currentOrder.status">
-            <option value="PENDING">待處理</option>
-            <option value="CONFIRMED">已確認</option>
-            <option value="CANCELLED">已取消</option>
-            <option value="COMPLETED">已完成</option>
-          </select>
-        </div>
-        <button class="btn-success" @click="saveOrder">儲存</button>
-        <button class="btn-secondary" @click="closeModal">取消</button>
       </div>
     </div>
   </div>
@@ -316,6 +471,10 @@
 
 <script>
 import axios from 'axios'
+import Login from './Login.vue'
+import { Form, Field, ErrorMessage } from 'vee-validate'
+import * as yup from 'yup'
+import { toTypedSchema } from '@vee-validate/yup'
 
 const API_BASE_URL = '/api'
 
@@ -328,10 +487,29 @@ const CurrencyCode = {
   CNY: 'CNY'
 }
 
+// 表單驗證規則
+const orderSchema = yup.object({
+  username: yup.string().required('使用者名稱為必填項').min(3, '使用者名稱至少需要 3 個字元').max(50, '使用者名稱不能超過 50 個字元'),
+  amount: yup.number().required('金額為必填項').min(0.01, '金額必須大於 0'),
+  currency: yup.string().required('請選擇幣別'),
+  discount: yup.number().nullable().min(0, '折扣不能小於 0').max(100, '折扣不能超過 100'),
+  status: yup.string().required('請選擇狀態')
+})
+
 export default {
   name: 'App',
+  components: {
+    Login,
+    Form,
+    Field,
+    ErrorMessage
+  },
   data() {
     return {
+      isAuthenticated: false,
+      currentUsername: '',
+      userRoles: [], // 用戶角色列表
+      menuItems: [], // 選單項目列表（從後端載入）
       orders: [],
       currencies: [],
       convertAmount: 0,
@@ -349,6 +527,14 @@ export default {
         discount: 0,
         status: 'PENDING'
       },
+      formattedAmount: '',
+      usernameSuggestions: [],
+      statusOptions: [
+        { value: 'PENDING', label: '待處理', icon: '⏳' },
+        { value: 'CONFIRMED', label: '已確認', icon: '✓' },
+        { value: 'CANCELLED', label: '已取消', icon: '✕' },
+        { value: 'COMPLETED', label: '已完成', icon: '✅' }
+      ],
       currentPage: 'orders',  // 預設顯示訂單列表
       // 分頁相關
       currentPageNumber: 0,
@@ -366,14 +552,131 @@ export default {
         message: '',
         fieldErrors: []
       },
-      notificationTimer: null
+      notificationTimer: null,
+      // 確認對話框
+      confirmDialog: {
+        show: false,
+        title: '',
+        message: '',
+        onConfirm: null,
+        onCancel: null
+      }
     }
   },
   mounted() {
-    this.loadOrders()
-    this.loadCurrencies()
+    // 檢查是否有保存的 token
+    const token = localStorage.getItem('token')
+    const username = localStorage.getItem('username')
+    
+    if (token && username) {
+      this.isAuthenticated = true
+      this.currentUsername = username
+      // 設置 axios 預設 header
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+      // 獲取用戶角色信息和選單
+      this.loadUserRoles().then(async () => {
+        await this.loadMenu()
+        this.loadOrders()
+        this.loadCurrencies()
+      })
+    }
   },
   methods: {
+    // 認證相關方法
+    async handleLoginSuccess(token, username) {
+      this.isAuthenticated = true
+      this.currentUsername = username
+      // 設置 axios 預設 header
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+      // 獲取用戶角色信息和選單
+      await this.loadUserRoles()
+      await this.loadMenu()
+      this.loadOrders()
+      this.loadCurrencies()
+    },
+    handleLogout() {
+      this.showConfirmDialog(
+        '確認登出',
+        '確定要登出系統嗎？',
+        () => {
+          localStorage.removeItem('token')
+          localStorage.removeItem('username')
+          delete axios.defaults.headers.common['Authorization']
+          this.isAuthenticated = false
+          this.currentUsername = ''
+          this.userRoles = []
+          this.menuItems = []
+          this.orders = []
+          this.currencies = []
+          this.showNotification('success', '已登出', '您已成功登出系統')
+        }
+      )
+    },
+    // 確認對話框相關方法
+    showConfirmDialog(title, message, onConfirm, onCancel = null) {
+      this.confirmDialog = {
+        show: true,
+        title: title,
+        message: message,
+        onConfirm: onConfirm,
+        onCancel: onCancel
+      }
+    },
+    executeConfirm() {
+      if (this.confirmDialog.onConfirm) {
+        this.confirmDialog.onConfirm()
+      }
+      this.confirmDialog.show = false
+      this.confirmDialog.onConfirm = null
+      this.confirmDialog.onCancel = null
+    },
+    cancelConfirm() {
+      if (this.confirmDialog.onCancel) {
+        this.confirmDialog.onCancel()
+      }
+      this.confirmDialog.show = false
+      this.confirmDialog.onConfirm = null
+      this.confirmDialog.onCancel = null
+    },
+    // 載入用戶角色信息
+    async loadUserRoles() {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/auth/me`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        })
+        this.userRoles = response.data.authorities || []
+      } catch (error) {
+        console.error('載入用戶角色失敗:', error)
+        this.userRoles = []
+      }
+    },
+    // 從後端載入選單
+    async loadMenu() {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/auth/menu`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        })
+        this.menuItems = response.data || []
+        // 如果選單為空，設置默認選單（向後兼容）
+        if (this.menuItems.length === 0) {
+          this.menuItems = [
+            { id: 'orders', label: '訂單列表', icon: '📋', route: 'orders' },
+            { id: 'currency', label: '幣別轉換系統', icon: '💱', route: 'currency' }
+          ]
+        }
+      } catch (error) {
+        console.error('載入選單失敗:', error)
+        // 如果載入失敗，使用默認選單
+        this.menuItems = [
+          { id: 'orders', label: '訂單列表', icon: '📋', route: 'orders' },
+          { id: 'currency', label: '幣別轉換系統', icon: '💱', route: 'currency' }
+        ]
+      }
+    },
     // 訊息通知相關方法
     showNotification(type, title, message = '', fieldErrors = []) {
       this.notification = {
@@ -415,11 +718,21 @@ export default {
       if (this.currentPage === page) {
         return
       }
+      // 檢查選單項是否存在（權限檢查）
+      const menuItem = this.menuItems.find(item => item.route === page)
+      if (!menuItem) {
+        this.showNotification('error', '權限不足', '您沒有權限訪問此功能')
+        return
+      }
       this.currentPage = page
       // 如果切換到訂單列表頁面，確保載入訂單資料
       if (page === 'orders') {
         this.currentPageNumber = 0  // 重置到第一頁
         this.loadOrders()
+      }
+      // 如果切換到幣別轉換頁面，確保載入幣別資料
+      if (page === 'currency') {
+        this.loadCurrencies()
       }
       // 如果切換到匯率管理頁面，確保載入匯率資料和自動更新狀態
       if (page === 'rates') {
@@ -438,7 +751,12 @@ export default {
           params.searchOrderId = searchOrderId.trim()
         }
         
-        const response = await axios.get(`${API_BASE_URL}/orders`, { params })
+        const response = await axios.get(`${API_BASE_URL}/orders`, { 
+          params,
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        })
         
         // 處理分頁響應
         if (response.data.content) {
@@ -455,6 +773,11 @@ export default {
         }
       } catch (error) {
         console.error('載入訂單失敗:', error)
+        // 如果是 401 未授權，則登出
+        if (error.response && error.response.status === 401) {
+          this.handleLogout()
+          return
+        }
         const { message } = this.parseError(error)
         this.showNotification('error', '載入訂單失敗', message)
       }
@@ -473,18 +796,32 @@ export default {
     },
     async loadCurrencies() {
       try {
-        const response = await axios.get(`${API_BASE_URL}/currencies`)
+        const response = await axios.get(`${API_BASE_URL}/currencies`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        })
         this.currencies = response.data
         if (this.currencies.length > 0) {
           this.sourceCurrency = this.currencies[0].currencyCode
         }
       } catch (error) {
         console.error('載入幣別失敗:', error)
-        // 如果沒有幣別資料，使用預設值
-        this.currencies = [
-          { currencyCode: CurrencyCode.TWD, rateToTwd: 1 },
-          { currencyCode: CurrencyCode.USD, rateToTwd: 0.032 }
-        ]
+        // 如果是 401 未授權，則登出
+        if (error.response && error.response.status === 401) {
+          this.handleLogout()
+          return
+        }
+        // 如果沒有幣別資料，使用預設值（僅在非認證錯誤時）
+        if (!error.response || error.response.status !== 403) {
+          this.currencies = [
+            { currencyCode: CurrencyCode.TWD, rateToTwd: 1 },
+            { currencyCode: CurrencyCode.USD, rateToTwd: 0.032 }
+          ]
+        } else {
+          const { message } = this.parseError(error)
+          this.showNotification('error', '載入幣別失敗', message)
+        }
       }
     },
     async convertCurrency() {
@@ -494,6 +831,9 @@ export default {
             amount: this.convertAmount,
             sourceCurrency: this.sourceCurrency,
             targetCurrency: this.targetCurrency
+          },
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
         })
         this.convertedResult = response.data
@@ -505,7 +845,11 @@ export default {
     },
     async convertOrderToTwd(orderId) {
       try {
-        const response = await axios.get(`${API_BASE_URL}/orders/${orderId}/convert/twd`)
+        const response = await axios.get(`${API_BASE_URL}/orders/${orderId}/convert/twd`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        })
         this.showNotification('success', '轉換成功', `轉換為 ${CurrencyCode.TWD}: ${response.data.toFixed(2)}`)
       } catch (error) {
         console.error('轉換失敗:', error)
@@ -516,12 +860,14 @@ export default {
     openAddModal() {
       this.isEditMode = false
       this.currentOrder = {
-        username: '',
+        username: this.currentUsername, // 自動填入當前登入用戶名
         amount: 0,
         currency: CurrencyCode.USD,
         discount: 0,
         status: 'PENDING'
       }
+      this.formattedAmount = ''
+      this.usernameSuggestions = []
       this.showModal = true
     },
     openEditModal(order) {
@@ -534,17 +880,59 @@ export default {
         discount: order.discount || 0,
         status: order.status
       }
+      this.formattedAmount = this.formatNumber(order.amount)
+      this.usernameSuggestions = []
       this.showModal = true
     },
     closeModal() {
       this.showModal = false
     },
+    resetOrderForm(resetForm) {
+      // 重置表單驗證狀態
+      if (resetForm) {
+        resetForm()
+      }
+      // 重置訂單資料到初始狀態
+      if (this.isEditMode) {
+        // 編輯模式：保持當前訂單資料，只重置表單驗證
+        // 不重置資料，讓用戶可以繼續編輯
+      } else {
+        // 新增模式：重置所有欄位
+        this.currentOrder = {
+          username: this.currentUsername,
+          amount: 0,
+          currency: CurrencyCode.USD,
+          discount: 0,
+          status: 'PENDING'
+        }
+        this.formattedAmount = ''
+        this.usernameSuggestions = []
+      }
+      // 顯示重置成功提示
+      this.showNotification('info', '表單已重置', '所有欄位已恢復為初始值')
+    },
+    async onSubmit(values, { resetForm }) {
+      // VeeValidate 已經驗證過表單，直接儲存
+      console.log('表單提交，值:', values)
+      console.log('當前訂單:', this.currentOrder)
+      try {
+        await this.saveOrder()
+        // 成功後重置表單
+        if (resetForm) resetForm()
+      } catch (error) {
+        console.error('表單提交錯誤:', error)
+        // 錯誤已在 saveOrder 中處理
+      }
+    },
     async saveOrder() {
       try {
+        const headers = {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
         if (this.isEditMode) {
-          await axios.put(`${API_BASE_URL}/orders/${this.currentOrder.orderId}`, this.currentOrder)
+          await axios.put(`${API_BASE_URL}/orders/${this.currentOrder.orderId}`, this.currentOrder, { headers })
         } else {
-          await axios.post(`${API_BASE_URL}/orders`, this.currentOrder)
+          await axios.post(`${API_BASE_URL}/orders`, this.currentOrder, { headers })
         }
         this.closeModal()
         // 重新載入當前頁面的資料
@@ -557,18 +945,26 @@ export default {
       }
     },
     async deleteOrder(orderId) {
-      if (confirm('確定要刪除這個訂單嗎？')) {
-        try {
-          await axios.delete(`${API_BASE_URL}/orders/${orderId}`)
-          // 重新載入當前頁面的資料
-          this.loadOrders(this.searchOrderId, this.currentPageNumber, this.pageSize)
-          this.showNotification('success', '刪除成功', '訂單已成功刪除')
-        } catch (error) {
-          console.error('刪除訂單失敗:', error)
-          const { message, fieldErrors } = this.parseError(error)
-          this.showNotification('error', '刪除訂單失敗', message, fieldErrors)
+      this.showConfirmDialog(
+        '刪除訂單',
+        '確定要刪除這個訂單嗎？此操作無法復原。',
+        async () => {
+          try {
+            await axios.delete(`${API_BASE_URL}/orders/${orderId}`, {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              }
+            })
+            // 重新載入當前頁面的資料
+            this.loadOrders(this.searchOrderId, this.currentPageNumber, this.pageSize)
+            this.showNotification('success', '刪除成功', '訂單已成功刪除')
+          } catch (error) {
+            console.error('刪除訂單失敗:', error)
+            const { message, fieldErrors } = this.parseError(error)
+            this.showNotification('error', '刪除訂單失敗', message, fieldErrors)
+          }
         }
-      }
+      )
     },
     clearSearch() {
       this.searchOrderId = ''
@@ -606,7 +1002,8 @@ export default {
       try {
         await axios.put(`${API_BASE_URL}/currencies/${currencyCode}/rate`, newRate, {
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
           }
         })
         delete this.editingRates[currencyCode]
@@ -620,20 +1017,26 @@ export default {
       }
     },
     async refreshRatesFromApi() {
-      if (!confirm('確定要從 ExchangeRate-API 更新所有匯率嗎？這會覆蓋目前的匯率設定。')) {
-        return
-      }
-      
-      try {
-        const response = await axios.post(`${API_BASE_URL}/currencies/refresh`)
-        this.showNotification('success', '更新成功', '已從 ExchangeRate-API 取得最新匯率')
-        // 重新載入匯率資料
-        await this.loadCurrencies()
-      } catch (error) {
-        console.error('更新匯率失敗:', error)
-        const { message, fieldErrors } = this.parseError(error)
-        this.showNotification('error', '更新匯率失敗', message, fieldErrors)
-      }
+      this.showConfirmDialog(
+        '更新匯率',
+        '確定要從 ExchangeRate-API 更新所有匯率嗎？這會覆蓋目前的匯率設定。',
+        async () => {
+          try {
+            const response = await axios.post(`${API_BASE_URL}/currencies/refresh`, null, {
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              }
+            })
+            this.showNotification('success', '更新成功', '已從 ExchangeRate-API 取得最新匯率')
+            // 重新載入匯率資料
+            await this.loadCurrencies()
+          } catch (error) {
+            console.error('更新匯率失敗:', error)
+            const { message, fieldErrors } = this.parseError(error)
+            this.showNotification('error', '更新匯率失敗', message, fieldErrors)
+          }
+        }
+      )
     },
     formatDateTime(dateTimeString) {
       if (!dateTimeString) return '-'
@@ -653,7 +1056,11 @@ export default {
     // 自動更新開關相關方法
     async loadAutoUpdateStatus() {
       try {
-        const response = await axios.get(`${API_BASE_URL}/currencies/auto-update/status`)
+        const response = await axios.get(`${API_BASE_URL}/currencies/auto-update/status`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          }
+        })
         this.autoUpdateEnabled = response.data.enabled
       } catch (error) {
         console.error('載入自動更新狀態失敗:', error)
@@ -663,15 +1070,18 @@ export default {
     },
     async toggleAutoUpdate() {
       try {
+        const headers = {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
         if (this.autoUpdateEnabled) {
           // 啟用自動更新
-          const response = await axios.post(`${API_BASE_URL}/currencies/auto-update/enable`)
+          const response = await axios.post(`${API_BASE_URL}/currencies/auto-update/enable`, null, { headers })
           this.showNotification('success', '操作成功', response.data.message || '自動更新已啟用')
           // 重新載入匯率資料
           await this.loadCurrencies()
         } else {
           // 停用自動更新
-          const response = await axios.post(`${API_BASE_URL}/currencies/auto-update/disable`)
+          const response = await axios.post(`${API_BASE_URL}/currencies/auto-update/disable`, null, { headers })
           this.showNotification('success', '操作成功', response.data.message || '自動更新已停用')
         }
       } catch (error) {
@@ -681,12 +1091,120 @@ export default {
         const { message, fieldErrors } = this.parseError(error)
         this.showNotification('error', '操作失敗', message, fieldErrors)
       }
+    },
+    // 金額格式化相關方法
+    formatNumber(value) {
+      if (!value && value !== 0) return ''
+      const num = parseFloat(value)
+      if (isNaN(num)) return ''
+      return num.toLocaleString('zh-TW', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    },
+    handleAmountInput(event) {
+      const value = event.target.value
+      const num = parseFloat(value)
+      if (!isNaN(num) && num > 0) {
+        this.currentOrder.amount = num
+        this.formattedAmount = this.formatNumber(num)
+      } else if (value === '' || value === null) {
+        this.currentOrder.amount = 0
+        this.formattedAmount = ''
+      }
+    },
+    formatCurrency(amount, currency) {
+      if (!amount) return '0.00'
+      const formatted = this.formatNumber(amount)
+      return `${formatted} ${currency}`
+    },
+    calculateDiscount() {
+      if (!this.currentOrder.amount || !this.currentOrder.discount) return 0
+      return this.currentOrder.amount * (this.currentOrder.discount / 100)
+    },
+    calculateFinalAmount() {
+      if (!this.currentOrder.amount) return 0
+      const discount = this.calculateDiscount()
+      return this.currentOrder.amount - discount
+    },
+    // 使用者名稱建議相關
+    filterUsernameSuggestions() {
+      const input = this.currentOrder.username.toLowerCase()
+      if (input.length < 2) {
+        this.usernameSuggestions = []
+        return
+      }
+      // 從現有訂單中提取使用者名稱建議
+      const uniqueUsernames = [...new Set(this.orders.map(o => o.username))]
+      this.usernameSuggestions = uniqueUsernames
+        .filter(u => u.toLowerCase().includes(input) && u !== this.currentOrder.username)
+        .slice(0, 5)
+    },
+    selectUsername(username) {
+      this.currentOrder.username = username
+      this.usernameSuggestions = []
+    },
+    getCurrencyName(code) {
+      const names = {
+        'TWD': '新台幣',
+        'USD': '美元',
+        'EUR': '歐元',
+        'JPY': '日圓',
+        'CNY': '人民幣'
+      }
+      return names[code] || code
+    },
+    // 處理折扣輸入限制
+    handleDiscountInput(event) {
+      let value = parseFloat(event.target.value)
+      // 如果是空值或 NaN，設為 0
+      if (isNaN(value) || value === null || value === undefined) {
+        this.currentOrder.discount = 0
+        return
+      }
+      // 限制不能為負數
+      if (value < 0) {
+        value = 0
+        this.currentOrder.discount = 0
+        this.showNotification('warning', '輸入限制', '折扣不能為負數，已自動調整為 0%')
+        return
+      }
+      // 限制不能超過 100
+      if (value > 100) {
+        value = 100
+        this.currentOrder.discount = 100
+        this.showNotification('warning', '輸入限制', '折扣不能超過 100%，已自動調整為 100%')
+        return
+      }
+      // 正常範圍內的值
+      this.currentOrder.discount = value
+    },
+    // 處理折扣滑桿輸入
+    handleDiscountSlider(event) {
+      let value = parseFloat(event.target.value)
+      // 確保值在 0-100 範圍內
+      if (isNaN(value)) {
+        this.currentOrder.discount = 0
+        return
+      }
+      if (value < 0) {
+        this.currentOrder.discount = 0
+      } else if (value > 100) {
+        this.currentOrder.discount = 100
+      } else {
+        this.currentOrder.discount = value
+      }
     }
   },
   // Expose CurrencyCode to template
   computed: {
     CurrencyCodes() {
       return CurrencyCode
+    },
+    // 檢查是否為管理員
+    isAdmin() {
+      return this.userRoles.includes('ROLE_ADMIN')
+    },
+    // 表單驗證規則（轉換為 VeeValidate 格式）
+    typedOrderSchema() {
+      return toTypedSchema(orderSchema)
     }
   }
 }
